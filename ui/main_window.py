@@ -1,4 +1,7 @@
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QTableWidget
+from PySide6.QtWidgets import QTableWidgetItem
+from core.calculator import CabinetCalculator
 from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
@@ -64,6 +67,62 @@ class MainWindow(QMainWindow):
         layout.addLayout(form)
 
         button = QPushButton("Рассчитать")
+        button.clicked.connect(self.calculate)
         button.setMinimumHeight(45)
 
         layout.addWidget(button)
+
+        self.table = QTableWidget()
+
+        self.table.setColumnCount(4)
+
+        self.table.setHorizontalHeaderLabels(
+            [
+                "Деталь",
+                "Ширина",
+                "Высота",
+                "Кол-во"
+            ]
+        )
+
+        layout.addWidget(self.table)
+
+    def calculate(self):
+
+        parts = CabinetCalculator.calculate(
+            self.height.value(),
+            self.width.value(),
+            self.depth.value(),
+            self.shelves.value(),
+            self.thickness.value(),
+        )
+
+        self.table.setRowCount(len(parts))
+
+        for row, part in enumerate(parts):
+
+            self.table.setItem(
+                row,
+                0,
+                QTableWidgetItem(part.name)
+            )
+
+            self.table.setItem(
+                row,
+                1,
+                QTableWidgetItem(str(part.width))
+            )
+
+            self.table.setItem(
+                row,
+                2,
+                QTableWidgetItem(str(part.height))
+            )
+
+            self.table.setItem(
+                row,
+                3,
+                QTableWidgetItem(str(part.quantity))
+            )
+
+        self.table.resizeColumnsToContents()
