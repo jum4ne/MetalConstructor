@@ -1,0 +1,86 @@
+[
+  {
+    "id": 1783646129650,
+    "date": "2026-07-10 04:15:29",
+    "name": "Металлический шкаф",
+    "client": "-",
+    "module_type": "Шкаф",
+    "sheets_count": 1,
+    "parts_count": 7,
+    "total_cost_rub": 14032.7,
+    "dxf_path": "cad\\dxf\\Шкаф_20260710_041529.dxf",
+    "status": "В расчёте"
+  },
+  {
+    "id": 1783862900526,
+    "date": "2026-07-12 16:28:20",
+    "name": "TERRASA Тумба 2 ящика",
+    "client": "-",
+    "module_type": "TERRASA Тумба 2 ящика",
+    "sheets_count": 1,
+    "parts_count": 10,
+    "total_cost_rub": 17297.6,
+    "dxf_path": "cad\\dxf\\TERRASA Тумба 2 ящика_20260712_162820.dxf",
+    "status": "В расчёте"
+  },
+  {
+    "id": 1783877647163,
+    "date": "2026-07-12 20:34:07",
+    "name": "TERRASA Вытяжка купольная",
+    "client": "-",
+    "module_type": "TERRASA Вытяжка",
+    "sheets_count": 1,
+    "parts_count": 10,
+    "total_cost_rub": 16577.32,
+    "dxf_path": "cad\\dxf\\TERRASA Вытяжка_20260712_203407.dxf",
+    "status": "В расчёте"
+  },
+  {
+    "id": 1783885564771,
+    "date": "2026-07-12 22:46:04",
+    "name": "TERRASA Вытяжка купольная",
+    "client": "-",
+    "module_type": "TERRASA Вытяжка",
+    "sheets_count": 2,
+    "parts_count": 10,
+    "total_cost_rub": 16843.12,
+    "dxf_path": "cad\\dxf\\TERRASA Вытяжка_20260712_224604.dxf",
+    "status": "В расчёте"
+  },
+  {
+    "id": 1783889692225,
+    "date": "2026-07-12 23:54:52",
+    "name": "Секция с выдвижными ящиками",
+    "client": "-",
+    "module_type": "Секция с выдвижными ящиками",
+    "sheets_count": 1,
+    "parts_count": 12,
+    "total_cost_rub": 19959.71,
+    "dxf_path": "cad\\dxf\\Секция с выдвижными ящиками_20260712_235452.dxf",
+    "status": "В расчёте"
+  },
+  {
+    "id": 1783890006853,
+    "date": "2026-07-13 00:00:06",
+    "name": "Секция с выдвижными ящиками",
+    "client": "-",
+    "module_type": "Секция с выдвижными ящиками",
+    "sheets_count": 1,
+    "parts_count": 12,
+    "total_cost_rub": 19477.86,
+    "dxf_path": "cad\\dxf\\Секция с выдвижными ящиками_20260713_000006.dxf",
+    "status": "В расчёте"
+  },
+  {
+    "id": 1783891249928,
+    "date": "2026-07-13 00:20:49",
+    "name": "Секция с выдвижными ящиками",
+    "client": "-",
+    "module_type": "Секция с выдвижными ящиками",
+    "sheets_count": 1,
+    "parts_count": 12,
+    "total_cost_rub": 19418.61,
+    "dxf_path": "cad\\dxf\\Секция с выдвижными ящиками_20260713_002049.dxf",
+    "status": "В расчёте"
+  }
+]

@@ -1,0 +1,205 @@
+{
+  "type": "kitchen_project",
+  "name": "Новый проект кухни",
+  "client": "",
+  "modules": [
+    {
+      "name": "Столешница",
+      "module_type": "Столешница",
+      "height": 1.2,
+      "width": 904,
+      "depth": 508,
+      "thickness": 1.2,
+      "parts": [
+        {
+          "name": "Столешница",
+          "width": 904,
+          "height": 508,
+          "quantity": 1,
+          "thickness": 1.2,
+          "bend_lines": [
+            {
+              "edge": "left",
+              "offset": 30,
+              "angle": 90.0,
+              "direction": "up",
+              "note": "борт 30мм"
+            },
+            {
+              "edge": "right",
+              "offset": 30,
+              "angle": 90.0,
+              "direction": "up",
+              "note": "борт 30мм"
+            },
+            {
+              "edge": "bottom",
+              "offset": 30,
+              "angle": 90.0,
+              "direction": "up",
+              "note": "борт 30мм"
+            }
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Тумба открытая",
+      "module_type": "Тумба",
+      "height": 1800,
+      "width": 904,
+      "depth": 508,
+      "thickness": 1.2,
+      "parts": [
+        {
+          "name": "Боковина",
+          "width": 508,
+          "height": 1800,
+          "quantity": 2,
+          "thickness": 1.2,
+          "bend_lines": [],
+          "cutouts": []
+        },
+        {
+          "name": "Крыша",
+          "width": 904,
+          "height": 508,
+          "quantity": 1,
+          "thickness": 1.2,
+          "bend_lines": [],
+          "cutouts": []
+        },
+        {
+          "name": "Дно",
+          "width": 904,
+          "height": 508,
+          "quantity": 1,
+          "thickness": 1.2,
+          "bend_lines": [],
+          "cutouts": []
+        },
+        {
+          "name": "Полка",
+          "width": 904,
+          "height": 506,
+          "quantity": 3,
+          "thickness": 1.2,
+          "bend_lines": [],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Шкаф под гриль",
+      "module_type": "Шкаф под гриль",
+      "height": 1800,
+      "width": 904,
+      "depth": 508,
+      "thickness": 1.2,
+      "parts": [
+        {
+          "name": "Боковина глухая",
+          "width": 508,
+          "height": 1800,
+          "quantity": 1,
+          "thickness": 1.2,
+          "bend_lines": [],
+          "cutouts": []
+        },
+        {
+          "name": "Боковина с вентиляцией",
+          "width": 508,
+          "height": 1800,
+          "quantity": 1,
+          "thickness": 1.2,
+          "bend_lines": [],
+          "cutouts": [
+            {
+              "shape": "circle",
+              "x": 169.33333333333334,
+              "y": 450.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 338.6666666666667,
+              "y": 450.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 169.33333333333334,
+              "y": 900.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 338.6666666666667,
+              "y": 900.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 169.33333333333334,
+              "y": 1350.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 338.6666666666667,
+              "y": 1350.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            }
+          ]
+        },
+        {
+          "name": "Дно",
+          "width": 904,
+          "height": 508,
+          "quantity": 1,
+          "thickness": 1.2,
+          "bend_lines": [],
+          "cutouts": []
+        },
+        {
+          "name": "Крыша (вырез под гриль)",
+          "width": 904,
+          "height": 508,
+          "quantity": 1,
+          "thickness": 1.2,
+          "bend_lines": [],
+          "cutouts": [
+            {
+              "shape": "rect",
+              "x": 452.0,
+              "y": 254.0,
+              "width": 560,
+              "height": 480,
+              "radius": 0,
+              "label": "Вырез под гриль/варочную панель"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "filename": "cad\\dxf\\TERRASA Тумба 2 ящика_20260712_162820.dxf",
+  "module_name": "TERRASA Тумба 2 ящика",
+  "module_type": "TERRASA Тумба 2 ящика",
+  "sheets_count": 1,
+  "parts_count": 10,
+  "split_parts_count": 0,
+  "sheet_area_m2": 2.72,
+  "parts_area_m2": 2.298,
+  "usage_percent": 84.47,
+  "waste_percent": 15.53,
+  "metal_cost_rub": 2297.6,
+  "work_cost_rub": 15000.0,
+  "total_cost_rub": 17297.6,
+  "parts": [
+    {
+      "name": "Боковина",
+      "width": 540,
+      "height": 1040,
+      "thickness": 1.5,
+      "quantity": 2
+    },
+    {
+      "name": "Задняя стенка",
+      "width": 440,
+      "height": 1040,
+      "thickness": 1.5,
+      "quantity": 1
+    },
+    {
+      "name": "Дно",
+      "width": 440,
+      "height": 540,
+      "thickness": 1.5,
+      "quantity": 1
+    },
+    {
+      "name": "Столешница-крышка",
+      "width": 480,
+      "height": 540,
+      "thickness": 1.5,
+      "quantity": 1
+    },
+    {
+      "name": "Полка нижняя (рейлинг)",
+      "width": 360,
+      "height": 500,
+      "thickness": 1.5,
+      "quantity": 1
+    },
+    {
+      "name": "Площадка колеса",
+      "width": 100,
+      "height": 100,
+      "thickness": 2.0,
+      "quantity": 4
+    }
+  ]
+}

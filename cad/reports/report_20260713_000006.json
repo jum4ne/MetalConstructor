@@ -1,0 +1,45 @@
+{
+  "filename": "cad\\dxf\\Секция с выдвижными ящиками_20260713_000006.dxf",
+  "module_name": "Секция с выдвижными ящиками",
+  "module_type": "Секция с выдвижными ящиками",
+  "sheets_count": 1,
+  "parts_count": 12,
+  "split_parts_count": 0,
+  "sheet_area_m2": 1.82,
+  "parts_area_m2": 1.478,
+  "usage_percent": 81.2,
+  "waste_percent": 18.8,
+  "metal_cost_rub": 1477.86,
+  "work_cost_rub": 18000.0,
+  "total_cost_rub": 19477.86,
+  "parts": [
+    {
+      "name": "Боковая панель",
+      "width": 513,
+      "height": 720,
+      "thickness": 1.0,
+      "quantity": 2
+    },
+    {
+      "name": "Задняя стенка",
+      "width": 714,
+      "height": 407,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Дно",
+      "width": 445,
+      "height": 471,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Направляющая",
+      "width": 393,
+      "height": 76,
+      "thickness": 1.0,
+      "quantity": 8
+    }
+  ]
+}

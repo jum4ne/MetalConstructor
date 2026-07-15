@@ -1,0 +1,52 @@
+{
+  "filename": "cad\\dxf\\TERRASA Вытяжка_20260712_224604.dxf",
+  "module_name": "TERRASA Вытяжка купольная",
+  "module_type": "TERRASA Вытяжка",
+  "sheets_count": 2,
+  "parts_count": 10,
+  "split_parts_count": 0,
+  "sheet_area_m2": 3.8,
+  "parts_area_m2": 1.843,
+  "usage_percent": 48.5,
+  "waste_percent": 51.5,
+  "metal_cost_rub": 1843.12,
+  "work_cost_rub": 15000.0,
+  "total_cost_rub": 16843.12,
+  "parts": [
+    {
+      "name": "Скос купола передний/задний",
+      "width": 1200,
+      "height": 293,
+      "thickness": 1.5,
+      "quantity": 2
+    },
+    {
+      "name": "Рамка жироулавливающего фильтра",
+      "width": 1100,
+      "height": 300,
+      "thickness": 1.5,
+      "quantity": 1
+    },
+    {
+      "name": "Скос купола боковой",
+      "width": 400,
+      "height": 293,
+      "thickness": 1.5,
+      "quantity": 2
+    },
+    {
+      "name": "Стенка шахты",
+      "width": 340,
+      "height": 357,
+      "thickness": 1.5,
+      "quantity": 4
+    },
+    {
+      "name": "Фланец дымохода",
+      "width": 300,
+      "height": 300,
+      "thickness": 1.5,
+      "quantity": 1
+    }
+  ]
+}

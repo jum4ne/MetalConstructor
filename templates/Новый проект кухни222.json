@@ -1,0 +1,487 @@
+{
+  "type": "kitchen_project",
+  "name": "Новый проект кухни",
+  "client": "",
+  "modules": [
+    {
+      "name": "Металлический шкаф",
+      "module_type": "Шкаф",
+      "height": 920,
+      "width": 860,
+      "depth": 580,
+      "thickness": 1.5,
+      "parts": [
+        {
+          "name": "Боковина",
+          "width": 620,
+          "height": 960,
+          "quantity": 2,
+          "thickness": 1.5,
+          "bend_lines": [
+            {
+              "edge": "left",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "right",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "top",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "bottom",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            }
+          ],
+          "cutouts": [],
+          "corner_relief": 3
+        },
+        {
+          "name": "Крыша",
+          "width": 860,
+          "height": 580,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        },
+        {
+          "name": "Дно",
+          "width": 860,
+          "height": 580,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        },
+        {
+          "name": "Полка",
+          "width": 900,
+          "height": 618,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [
+            {
+              "edge": "left",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "right",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "top",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "bottom",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            }
+          ],
+          "cutouts": [],
+          "corner_relief": 3
+        },
+        {
+          "name": "Дверь",
+          "width": 429,
+          "height": 919,
+          "quantity": 2,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        }
+      ]
+    },
+    {
+      "name": "Металлический шкаф",
+      "module_type": "Шкаф",
+      "height": 920,
+      "width": 860,
+      "depth": 580,
+      "thickness": 1.5,
+      "parts": [
+        {
+          "name": "Боковина",
+          "width": 620,
+          "height": 960,
+          "quantity": 2,
+          "thickness": 1.5,
+          "bend_lines": [
+            {
+              "edge": "left",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "right",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "top",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "bottom",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            }
+          ],
+          "cutouts": [],
+          "corner_relief": 3
+        },
+        {
+          "name": "Крыша",
+          "width": 860,
+          "height": 580,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        },
+        {
+          "name": "Дно",
+          "width": 860,
+          "height": 580,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        },
+        {
+          "name": "Полка",
+          "width": 900,
+          "height": 618,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [
+            {
+              "edge": "left",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "right",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "top",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            },
+            {
+              "edge": "bottom",
+              "offset": 20,
+              "angle": 90,
+              "direction": "down",
+              "note": "гиб 20мм"
+            }
+          ],
+          "cutouts": [],
+          "corner_relief": 3
+        },
+        {
+          "name": "Дверь",
+          "width": 429,
+          "height": 919,
+          "quantity": 2,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        }
+      ]
+    },
+    {
+      "name": "Шкаф под гриль",
+      "module_type": "Шкаф под гриль",
+      "height": 920,
+      "width": 860,
+      "depth": 580,
+      "thickness": 1.5,
+      "parts": [
+        {
+          "name": "Боковина глухая",
+          "width": 580,
+          "height": 920,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        },
+        {
+          "name": "Боковина с вентиляцией",
+          "width": 580,
+          "height": 920,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [
+            {
+              "shape": "circle",
+              "x": 193.33333333333334,
+              "y": 230.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 386.6666666666667,
+              "y": 230.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 193.33333333333334,
+              "y": 460.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 386.6666666666667,
+              "y": 460.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 193.33333333333334,
+              "y": 690.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            },
+            {
+              "shape": "circle",
+              "x": 386.6666666666667,
+              "y": 690.0,
+              "width": 0,
+              "height": 0,
+              "radius": 8,
+              "label": "Вент."
+            }
+          ],
+          "corner_relief": 0
+        },
+        {
+          "name": "Дно",
+          "width": 860,
+          "height": 580,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        },
+        {
+          "name": "Крыша (вырез под гриль)",
+          "width": 860,
+          "height": 580,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [
+            {
+              "shape": "rect",
+              "x": 430.0,
+              "y": 290.0,
+              "width": 560,
+              "height": 480,
+              "radius": 0,
+              "label": "Вырез под гриль/варочную панель"
+            }
+          ],
+          "corner_relief": 0
+        }
+      ]
+    },
+    {
+      "name": "Шкаф под мойку",
+      "module_type": "Шкаф под мойку",
+      "height": 920,
+      "width": 860,
+      "depth": 580,
+      "thickness": 1.5,
+      "parts": [
+        {
+          "name": "Боковина",
+          "width": 580,
+          "height": 920,
+          "quantity": 2,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        },
+        {
+          "name": "Дно",
+          "width": 860,
+          "height": 580,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        },
+        {
+          "name": "Крыша (вырез под мойку)",
+          "width": 860,
+          "height": 580,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [
+            {
+              "shape": "rect",
+              "x": 430.0,
+              "y": 290.0,
+              "width": 400,
+              "height": 350,
+              "radius": 0,
+              "label": "Вырез под мойку"
+            }
+          ],
+          "corner_relief": 0
+        },
+        {
+          "name": "Дверь",
+          "width": 429,
+          "height": 919,
+          "quantity": 2,
+          "thickness": 1.5,
+          "bend_lines": [],
+          "cutouts": [],
+          "corner_relief": 0
+        }
+      ]
+    },
+    {
+      "name": "Столешница",
+      "module_type": "Столешница",
+      "height": 1.5,
+      "width": 860,
+      "depth": 580,
+      "thickness": 1.5,
+      "parts": [
+        {
+          "name": "Столешница",
+          "width": 860,
+          "height": 580,
+          "quantity": 1,
+          "thickness": 1.5,
+          "bend_lines": [
+            {
+              "edge": "left",
+              "offset": 30,
+              "angle": 90.0,
+              "direction": "up",
+              "note": "борт 30мм"
+            },
+            {
+              "edge": "right",
+              "offset": 30,
+              "angle": 90.0,
+              "direction": "up",
+              "note": "борт 30мм"
+            },
+            {
+              "edge": "bottom",
+              "offset": 30,
+              "angle": 90.0,
+              "direction": "up",
+              "note": "борт 30мм"
+            }
+          ],
+          "cutouts": [],
+          "corner_relief": 0
+        }
+      ]
+    }
+  ],
+  "placements": [
+    {
+      "x": 0.0,
+      "y": 0.0,
+      "angle": 0
+    },
+    {
+      "x": 860.0,
+      "y": 0.0,
+      "angle": 0
+    },
+    {
+      "x": 1720.0,
+      "y": 0.0,
+      "angle": 0
+    },
+    {
+      "x": 2580.0,
+      "y": 0.0,
+      "angle": 0
+    },
+    {
+      "x": 3440.0,
+      "y": 0.0,
+      "angle": 0
+    }
+  ]
+}

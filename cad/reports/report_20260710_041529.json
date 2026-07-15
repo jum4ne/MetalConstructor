@@ -1,0 +1,52 @@
+{
+  "filename": "cad\\dxf\\Шкаф_20260710_041529.dxf",
+  "module_name": "Металлический шкаф",
+  "module_type": "Шкаф",
+  "sheets_count": 1,
+  "parts_count": 7,
+  "split_parts_count": 0,
+  "sheet_area_m2": 4.2,
+  "parts_area_m2": 3.533,
+  "usage_percent": 84.11,
+  "waste_percent": 15.89,
+  "metal_cost_rub": 3532.7,
+  "work_cost_rub": 10500.0,
+  "total_cost_rub": 14032.7,
+  "parts": [
+    {
+      "name": "Боковина",
+      "width": 620,
+      "height": 960,
+      "thickness": 1.5,
+      "quantity": 2
+    },
+    {
+      "name": "Дверь",
+      "width": 429,
+      "height": 919,
+      "thickness": 1.5,
+      "quantity": 2
+    },
+    {
+      "name": "Полка",
+      "width": 900,
+      "height": 618,
+      "thickness": 1.5,
+      "quantity": 1
+    },
+    {
+      "name": "Крыша",
+      "width": 860,
+      "height": 580,
+      "thickness": 1.5,
+      "quantity": 1
+    },
+    {
+      "name": "Дно",
+      "width": 860,
+      "height": 580,
+      "thickness": 1.5,
+      "quantity": 1
+    }
+  ]
+}
