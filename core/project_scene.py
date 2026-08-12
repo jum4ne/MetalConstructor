@@ -58,64 +58,23 @@ def build_project_scene(project, gap_mm=250, exploded=False):
         if placement is None:
             placement = type('P', (), {'x': 0, 'y': 0, 'angle': 0})()
 
-        # столешница и подобные плоские модули (height=толщина, не настоящая
-        # высота) - для сцены кухни целиком их пропускаем (они не шкафообразные,
-        # добавлять их в общую 3D-сцену как "шкаф" было бы некорректно)
-        # Настоящие детали мастера называются "Панель боковая"/"Боковая панель",
-        # а не "Боковина". Старый фильтр их не узнавал -> ВСЕ модули комплекса
-        # отсеивались, и сцена кухни выходила пустой (min() of empty sequence).
-        SIDE_PREFIXES = ("Боковина", "Боковая", "Панель боковая")
-        if not any(p.name.startswith(SIDE_PREFIXES) for p in module.parts):
-            continue
-
-        # Сцену строим ИЗ НАСТОЯЩИХ ДЕТАЛЕЙ модуля. Старый build_cabinet_scene
-        # синтезировал коробки из габаритов и с реальными деталями связан не был.
-        try:
-            from core.module_scene import build_module_scene
-            plates, rods = build_module_scene(module, gap=0)
-        except Exception:
-            shelf_count = sum(p.quantity for p in module.parts if p.name.startswith("Полка"))
-            door_count = sum(p.quantity for p in module.parts if p.name.startswith("Дверь"))
-            plates, rods = build_cabinet_scene(
-                module.height, module.width, module.depth,
-                shelf_count=shelf_count, door_count=door_count,
-                has_tubes=bool(getattr(module, 'tubes', None))
-            )
-
-        if not plates and not rods:
-            continue
-
+        # Для ОБЩЕГО вида комплекса каждый модуль — это ОДНА чистая коробка по
+        # его габариту (Ш×Г×В), а не россыпь панелей внутри. Поэтому больше НЕ
+        # фильтруем модули по типу деталей и НЕ строим полную сцену панелей:
+        # раньше фартук и вытяжка отсеивались (нет «боковой» панели) и в общий
+        # вид/спецификацию не попадали — комплекс выходил неполным.
         gap_x = i * gap_mm if exploded else 0
+        w = module.width
+        d = getattr(module, 'depth', 600) or 600
+        h = getattr(module, 'height', 0) or 0
+        ang = int(getattr(placement, 'angle', 0)) % 180
+        if ang == 90:            # поворот на 90° меняет ширину и глубину местами
+            w, d = d, w
+        x0 = getattr(placement, 'x', 0) + gap_x
+        y0 = getattr(placement, 'y', 0)
+        bbox = (x0, x0 + w, y0, y0 + d, 0, max(h, 1))
 
-        def transform_point(pt):
-            x, y, z = pt
-            rx, ry = _rotate_xy(x, y, placement.angle)
-            return (rx + placement.x + gap_x, ry + placement.y, z)
-
-        # трансформируем углы каждой панели/трубы в мировые координаты
-        # (используем ассемблированное положение, factor=0 - без внутреннего
-        # разнесения деталей внутри модуля, т.к. это уже отдельная страница)
-        world_plates = []
-        for p in plates:
-            world_corners = [transform_point(pt) for pt in p.corners_3d]
-            new_p = type(p)(world_corners, p.pos_num, p.label, explode_dir=(0, 0, 0))
-            world_plates.append(new_p)
-
-        world_rods = []
-        for r in rods:
-            wp1 = transform_point(r.p1)
-            wp2 = transform_point(r.p2)
-            new_r = type(r)(wp1, wp2, r.pos_num, r.label, explode_dir=(0, 0, 0))
-            world_rods.append(new_r)
-
-        all_pts = [pt for p in world_plates for pt in p.corners_3d] + \
-                   [pt for r in world_rods for pt in (r.p1, r.p2)]
-        xs = [p[0] for p in all_pts]
-        ys = [p[1] for p in all_pts]
-        zs = [p[2] for p in all_pts]
-        bbox = (min(xs), max(xs), min(ys), max(ys), min(zs), max(zs))
-
-        blocks.append(ModuleBlock(len(blocks) + 1, module.name, world_plates, world_rods, bbox))
+        blocks.append(ModuleBlock(len(blocks) + 1, module.name, [], [], bbox))
 
     return blocks
 
@@ -152,17 +111,16 @@ def draw_project_scene_page(c, blocks, page_size, title, company_name, code,
 
     x_min, x_max, y_min, y_max, z_min, z_max = _bounding_box_all(blocks)
 
-    # находим 2D-габариты сцены В ПРОЕКЦИИ (не в 3D) для масштабирования
+    # находим 2D-габариты сцены В ПРОЕКЦИИ (не в 3D) для масштабирования —
+    # по 8 углам коробки каждого модуля.
     xs2d, ys2d = [], []
     for b in blocks:
-        for p in b.plates:
-            for pt in p.corners_3d:
-                sx, sy = iso_project(*pt)
-                xs2d.append(sx); ys2d.append(sy)
-        for r in b.rods:
-            for pt in (r.p1, r.p2):
-                sx, sy = iso_project(*pt)
-                xs2d.append(sx); ys2d.append(sy)
+        bx0, bx1, by0, by1, bz0, bz1 = b.bbox
+        for cxp in (bx0, bx1):
+            for cyp in (by0, by1):
+                for czp in (bz0, bz1):
+                    sx, sy = iso_project(cxp, cyp, czp)
+                    xs2d.append(sx); ys2d.append(sy)
 
     scene_w = max(xs2d) - min(xs2d)
     scene_h = max(ys2d) - min(ys2d)
@@ -179,50 +137,62 @@ def draw_project_scene_page(c, blocks, page_size, title, company_name, code,
         sx, sy = iso_project(x, y, z)
         return origin_x + (sx - cx) * scale * mm, origin_y + (sy - cy) * scale * mm
 
-    for b in blocks:
-        # Соседние модули красим чуть по-разному (темнее/светлее), иначе
-        # два одинаковых типа деталей (например боковины соседних шкафов)
-        # сливаются в одно бесформенное пятно на общем виде кухни.
-        brightness = 1.0 if b.pos_num % 2 == 1 else 0.82
+    # --- Каждый модуль = ЧИСТАЯ изометрическая коробка (по своему габариту),
+    #     а не куча полупрозрачных цветных панелей внутри. Три видимые грани
+    #     заливаем градацией серого (сверху светлее, справа темнее) — это даёт
+    #     аккуратный технический объём без цветовой каши. ---
+    def _box_faces(bbox):
+        x0, x1, y0, y1, z0, z1 = bbox
+        return {
+            'front': [(x0, y0, z0), (x1, y0, z0), (x1, y0, z1), (x0, y0, z1)],
+            'right': [(x1, y0, z0), (x1, y1, z0), (x1, y1, z1), (x1, y0, z1)],
+            'top':   [(x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)],
+        }
+    FACE_SHADE = {'top': 0.97, 'front': 0.88, 'right': 0.78}
 
-        c.setLineWidth(1.2)
-        c.setStrokeColorRGB(0.35, 0.35, 0.35)
-        for r in b.rods:
-            x1, y1 = to_paper(*r.p1)
-            x2, y2 = to_paper(*r.p2)
-            c.line(x1, y1, x2, y2)
+    # Painter's algorithm: дальние коробки рисуем первыми, ближние перекрывают.
+    # Камера смотрит с (+x,-y,+z), поэтому «ближе» = больше (x - y).
+    ordered = sorted(blocks, key=lambda b: (b.center_3d()[0] - b.center_3d()[1]))
 
-        for p in b.plates:
-            pts2d = [to_paper(*pt) for pt in p.corners_3d]
+    for b in ordered:
+        faces = _box_faces(b.bbox)
+        for fname in ('front', 'right', 'top'):
+            pts2d = [to_paper(*pt) for pt in faces[fname]]
             path = c.beginPath()
             path.moveTo(*pts2d[0])
             for pt in pts2d[1:]:
                 path.lineTo(*pt)
             path.close()
-            color = shade_color(get_panel_color(p.label), brightness)
-            c.setFillColorRGB(*color)
-            try:
-                c.setFillAlpha(0.88)  # лёгкая прозрачность - видно, где панели перекрываются
-            except Exception:
-                pass  # на случай если версия reportlab не поддерживает alpha
-            c.setStrokeColorRGB(0.1, 0.1, 0.1)
-            c.setLineWidth(0.6)
-            c.drawPath(path, fill=1, stroke=1)
-            try:
-                c.setFillAlpha(1.0)
-            except Exception:
-                pass
-
-        if show_positions:
-            cx3, cy3, cz3 = b.center_3d()
-            px, py = to_paper(cx3, cy3, cz3)
-            c.setFillColorRGB(1, 1, 1)
+            g = FACE_SHADE[fname]
+            c.setFillColorRGB(g, g, g)
             c.setStrokeColorRGB(0, 0, 0)
+            c.setLineWidth(0.9)
+            c.drawPath(path, fill=1, stroke=1)
+
+    # --- Номера позиций: кружок НАД модулем + выноска к верхней грани ---
+    if show_positions:
+        c.setFont(font_name, 9)
+        for b in blocks:
+            x0, x1, y0, y1, z0, z1 = b.bbox
+            tx, ty = to_paper((x0 + x1) / 2, y0, z1)   # верх-перед модуля
+            nx, ny = tx, ty + 13 * mm
+            c.setLineWidth(0.4)
+            c.setStrokeColorRGB(0, 0, 0)
+            c.line(tx, ty, nx, ny)
+            c.setFillColorRGB(1, 1, 1)
             c.setLineWidth(0.7)
-            c.circle(px, py, 4.5 * mm, fill=1, stroke=1)
-            c.setFont(font_name, 9)
+            c.circle(nx, ny, 4.5 * mm, fill=1, stroke=1)
             c.setFillColorRGB(0, 0, 0)
-            c.drawCentredString(px, py - 3, str(b.pos_num))
+            c.drawCentredString(nx, ny - 3, str(b.pos_num))
+
+    # --- Габариты комплекса подписью (длина × глубина × высота) ---
+    L = int(round(x_max - x_min))
+    D = int(round(y_max - y_min))
+    H = int(round(z_max - z_min))
+    c.setFont(font_name, 8.5)
+    c.setFillColorRGB(0, 0, 0)
+    c.drawString(margin_left + 3 * mm, page_h - margin_top - 14 * mm,
+                 f"Габариты комплекса: длина {L} × глубина {D} × высота {H} мм")
 
     if show_legend:
         legend_x = page_w - margin_right - legend_w + 3 * mm

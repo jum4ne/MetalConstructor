@@ -41,6 +41,7 @@ from core.geometry import Contour, bend_deduction, flat_length
 from core.models import Part, BendLine, Cutout, TubePart
 from core.module import Module
 from core.rules import Rules
+from core.electrical_cabinet import ElectricalCabinet
 
 # --- Константы гибки (из развёрток мастера) ---
 RELIEF = 2.51           # зазор угловой релиз-прорези (x76 по комплекту)
@@ -273,9 +274,13 @@ class SectionDrawers:
         m.add_part(rail)
 
         # --- Подсборки: 4 выдвижных ящика ---
+        # Высота фасада ящика тянется за высотой секции (эталон 237 при H=820),
+        # ширина/глубина короба — за шириной/глубиной секции.
+        front_h = int(round(height * 237 / 820))
         for i in range(1, SectionDrawers.DRAWERS + 1):
             m.add_subassembly(DrawerUnit.build(
-                width=core_x, depth=belt_d, thickness=thickness, index=i))
+                width=core_x, depth=belt_d, thickness=thickness, index=i,
+                front_h=front_h))
 
         return m
 
@@ -292,15 +297,26 @@ class DrawerUnit:
 
     CODE = "К 01.01.02.000"
 
+    # ---- ПАРАМЕТРИЧЕСКАЯ РАЗВЁРТКА УЗЛА (выведено из эталона) ----
+    # Раньше размеры деталей ящика были ВБИТЫ числами (686, 641, 237, 496,
+    # 536, 175) и НЕ менялись при смене габарита секции — мастер жаловался,
+    # что уменьшил секцию, а ящик в PDF остался прежним. Теперь размеры —
+    # «база + вычет», поэтому при типовом ящике совпадают с эталоном, а при
+    # другом размере ТЯНУТСЯ за ним:
+    #   Корпус ящика  686x641 = (глубина+193) x (ширина+184)
+    #   Панель        237x496 =  front_h       x (ширина+39)
+    #   Накладка      536x175 = (ширина+79)    x (front_h*175/237)
+    # где width=457, depth=493, front_h=237 у эталонного ящика.
+
     @staticmethod
-    def build(width, depth, thickness=1.0, index=1):
+    def build(width, depth, thickness=1.0, index=1, front_h=237):
         d = Module(name=f"Ящик выдвижной {index}", module_type="Ящик выдвижной",
-                   height=175, width=int(width), depth=int(depth),
+                   height=int(front_h), width=int(width), depth=int(depth),
                    thickness=thickness)
 
-        # Корпус ящика (К 01.01.02.001). Эталон 686.0 x 641.0 - это развёртка
-        # коробки: борта по всем сторонам + углы вырезаны.
-        body = Part("Корпус ящика", 686, 641, 1, thickness)
+        # Корпус ящика (К 01.01.02.001). Развёртка коробки: борта по всем
+        # сторонам + углы вырезаны. Эталон 686x641 при depth=493, width=457.
+        body = Part("Корпус ящика", int(depth + 193), int(width + 184), 1, thickness)
         body.bend_lines = [
             _bend("left", FLANGE, "up", thickness=body.thickness),
             _bend("right", FLANGE, "up", thickness=body.thickness),
@@ -313,8 +329,9 @@ class DrawerUnit:
         body.is_hidden_in_assembly = True
         d.add_part(body)
 
-        # Панель ящика (К 01.01.02.002). Эталон 237.2 x 496.0, есть 2 дуги
-        panel = Part("Панель ящик выдвижной", 237, 496, 1, thickness)
+        # Панель ящика (К 01.01.02.002). Эталон 237.2 x 496.0 при front_h=237,
+        # width=457. Ширина панели тянется за шириной ящика.
+        panel = Part("Панель ящик выдвижной", int(front_h), int(width + 39), 1, thickness)
         panel.bend_lines = [
             _bend("left", FLANGE, "up", thickness=panel.thickness),
         ]
@@ -322,9 +339,10 @@ class DrawerUnit:
                              "накладка; скруглённые углы (см. эталон DXF).")
         d.add_part(panel)
 
-        # Декоративная накладка (К 01.01.02.003). Эталон 536.2 x 174.6 - ВИДИМАЯ
+        # Декоративная накладка (К 01.01.02.003). Эталон 536.2 x 174.6 - ВИДИМАЯ,
+        # тянется за шириной ящика и высотой фасада.
         deco = Part("Декоративная накладка на панель для ящика выдвижного",
-                    536, 175, 1, thickness)
+                    int(width + 79), int(round(front_h * 175 / 237)), 1, thickness)
         deco.bend_lines = [
             _bend("left", 19.8, "down", thickness=deco.thickness),
             _bend("right", 19.8, "down", thickness=deco.thickness),
@@ -410,7 +428,7 @@ class SectionSink:
         m.add_part(back)
 
         # --- Подсборка: Фасад (К 01.02.02.000), 2 створки ---
-        m.add_subassembly(SinkFacade.build(thickness=thickness))
+        m.add_subassembly(SinkFacade.build(width=width, height=height, thickness=thickness))
         return m
 
 
@@ -424,16 +442,24 @@ class SinkFacade:
     CODE = "К 01.02.02.000"
 
     @staticmethod
-    def build(thickness=1.0):
+    def build(width=1000, height=820, thickness=1.0):
         f = Module(name="Фасад", module_type="Фасад",
-                   height=820, width=1000, depth=60, thickness=thickness)
+                   height=int(height), width=int(width), depth=60, thickness=thickness)
 
-        # Рамка створки из трубы 20х20х1,5
-        f.add_tube(TubePart(20, 20, 1.5, 415, quantity=4, note="рамка створки (гориз.)"))
-        f.add_tube(TubePart(20, 20, 1.5, 700, quantity=4, note="рамка створки (верт.)"))
+        # Створка = половина ширины секции минус зазор между створками (эталон
+        # 495 при width=1000). Все детали фасада тянутся за этим размером и за
+        # высотой секции — раньше они были ВБИТЫ и не менялись с габаритом.
+        stvorka_w = int((width - 10) / 2)                 # 1000 -> 495
+
+        # Рамка створки из трубы 20х20х1,5 (эталон 415 и 700)
+        f.add_tube(TubePart(20, 20, 1.5, int(stvorka_w - 80), quantity=4,
+                            note="рамка створки (гориз.)"))
+        f.add_tube(TubePart(20, 20, 1.5, int(height - 120), quantity=4,
+                            note="рамка створки (верт.)"))
 
         # Панель на фасад с ручкой (К 01.02.02.001) x2. Эталон 846.4 x 495.0
-        handle = Part("Панель на фасад с ручкой", 846, 495, 2, thickness)
+        # при height=820, stvorka_w=495.
+        handle = Part("Панель на фасад с ручкой", int(height + 26), int(stvorka_w), 2, thickness)
         handle.bend_lines = [
             _bend("left", 18.6, "down", thickness=handle.thickness),
         ]
@@ -443,7 +469,8 @@ class SinkFacade:
         f.add_part(handle)
 
         # Панель декоративная на фасад (К 01.02.02.002) x2. Эталон 535.2 x 784.6
-        deco = Part("Панель декоративная на фасад", 535, 785, 2, thickness)
+        # при stvorka_w=495, height=820.
+        deco = Part("Панель декоративная на фасад", int(stvorka_w + 40), int(height - 35), 2, thickness)
         deco.bend_lines = [
             _bend("left", 19.8, "down", thickness=deco.thickness),
             _bend("right", 19.8, "down", thickness=deco.thickness),
@@ -716,6 +743,10 @@ REAL_MODULES = {
     "section_grill":   ("К 01.03 · Секция с мангалом", SectionGrill.build,  1000),
     "apron":           ("К 01.04 · Фартук",            Apron.build,         1000),
     "hood":            ("К 01.05 · Вытяжка",           Hood.build,          1000),
+    # Электромонтажный шкаф (см. core/electrical_cabinet). Один чертёж-раскрой
+    # = все детали + 3 двери на выбор. Габарит эталона 400x445x150, 1.2мм;
+    # размеры параметрические. Выгрузка DXF идёт единым раскроем (cut_layout).
+    "ecab": ("ЭШ · Электромонтажный шкаф", ElectricalCabinet.build, 400),
 }
 
 

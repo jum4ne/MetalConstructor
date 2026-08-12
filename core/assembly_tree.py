@@ -163,7 +163,11 @@ class AssemblyNode:
             return False
         if not hasattr(self.source, "height"):
             return False
-        return any(p.name.startswith("Боковина") for p in self.parts)
+        # Настоящие модули мастера называют боковые панели «Боковая панель» /
+        # «Панель боковая», а не «Боковина» — старый узкий префикс их не узнавал,
+        # и НИ ОДНА секция не получала сборочный/разнесённый вид.
+        return any(p.name.startswith(("Боковина", "Боковая", "Панель боковая"))
+                   for p in self.parts)
 
     def __repr__(self):
         return f"<AssemblyNode {self.name!r} parts={len(self.parts)} children={len(self.children)}>"

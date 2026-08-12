@@ -1,0 +1,59 @@
+{
+  "filename": "cad\\dxf\\VERANDA Секция под мойку_20260716_043203.dxf",
+  "module_name": "VERANDA Секция под мойку",
+  "module_type": "VERANDA Секция под мойку",
+  "sheets_count": 2,
+  "parts_count": 11,
+  "split_parts_count": 0,
+  "sheet_area_m2": 6.25,
+  "parts_area_m2": 3.691,
+  "usage_percent": 59.05,
+  "waste_percent": 40.95,
+  "metal_cost_rub": 4428.84,
+  "work_cost_rub": 1650,
+  "total_cost_rub": 6078.84,
+  "parts": [
+    {
+      "name": "Боковина",
+      "width": 640,
+      "height": 890,
+      "thickness": 1.0,
+      "quantity": 2
+    },
+    {
+      "name": "Задняя стенка",
+      "width": 840,
+      "height": 890,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Столешница (вырез под мойку)",
+      "width": 880,
+      "height": 640,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Дверь",
+      "width": 399,
+      "height": 849,
+      "thickness": 1.0,
+      "quantity": 2
+    },
+    {
+      "name": "Дно",
+      "width": 840,
+      "height": 640,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Пятка опоры",
+      "width": 80,
+      "height": 80,
+      "thickness": 2.0,
+      "quantity": 4
+    }
+  ]
+}

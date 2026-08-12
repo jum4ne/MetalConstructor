@@ -60,19 +60,27 @@ class KitchenProject:
 
     @property
     def parts(self):
-        """Все детали всех модулей вместе, с префиксом названия модуля для читаемости на чертеже/в спецификации"""
+        """
+        Все детали всех модулей вместе, с префиксом названия модуля.
+
+        ВАЖНО: берём module.all_parts (СВОИ + детали подсборок), а не
+        module.parts. Раньше здесь был module.parts — и панели ящиков,
+        декоративные накладки и панели фасада (14 типов, 16 шт на комплексе
+        К 01) НЕ попадали ни в общий DXF-раскрой, ни в массу/смету: цех
+        получал неполный комплект.
+        """
         combined = []
         for module in self.modules:
-            for part in module.parts:
+            for part in module.all_parts:
                 combined.append(replace(part, name=f"[{module.name}] {part.name}"))
         return combined
 
     @property
     def tubes(self):
-        """Все трубы каркаса всех модулей вместе, с префиксом названия модуля"""
+        """Все трубы каркаса всех модулей вместе (вкл. подсборки), с префиксом модуля"""
         combined = []
         for module in self.modules:
-            for tube in getattr(module, 'tubes', []):
+            for tube in module.all_tubes:
                 combined.append(replace(tube, note=f"[{module.name}] {tube.note}".strip()))
         return combined
 

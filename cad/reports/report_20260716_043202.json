@@ -1,0 +1,73 @@
+{
+  "filename": "cad\\dxf\\TERRASA Секция с грилем_20260716_043202.dxf",
+  "module_name": "TERRASA Секция с грилем",
+  "module_type": "TERRASA Секция с грилем",
+  "sheets_count": 5,
+  "parts_count": 13,
+  "split_parts_count": 0,
+  "sheet_area_m2": 15.625,
+  "parts_area_m2": 6.178,
+  "usage_percent": 39.54,
+  "waste_percent": 60.46,
+  "metal_cost_rub": 7413.96,
+  "work_cost_rub": 1950,
+  "total_cost_rub": 9363.96,
+  "parts": [
+    {
+      "name": "Столешница (вырез под гриль)",
+      "width": 1280,
+      "height": 640,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Дно",
+      "width": 1240,
+      "height": 640,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Задняя стенка",
+      "width": 1240,
+      "height": 890,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Полка нижняя (рейлинг)",
+      "width": 1160,
+      "height": 600,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Боковина",
+      "width": 640,
+      "height": 890,
+      "thickness": 1.0,
+      "quantity": 2
+    },
+    {
+      "name": "Боковина с вентиляцией",
+      "width": 640,
+      "height": 890,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "Дверь",
+      "width": 599,
+      "height": 849,
+      "thickness": 1.0,
+      "quantity": 2
+    },
+    {
+      "name": "Площадка колеса",
+      "width": 100,
+      "height": 100,
+      "thickness": 2.0,
+      "quantity": 4
+    }
+  ]
+}

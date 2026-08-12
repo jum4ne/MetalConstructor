@@ -232,7 +232,10 @@ class TestAllFiveModules:
 
     def test_все_пять_модулей_собираются(self):
         from core import real_modules as R
-        assert len(R.REAL_MODULES) == 5
+        # Пять модулей кухонного комплекса К 01.00 (сверх них в реестре могут
+        # быть другие изделия, напр. электрошкафы — их проверяем ниже отдельно).
+        KITCHEN = {"section_drawers", "section_sink", "section_grill", "apron", "hood"}
+        assert KITCHEN <= set(R.REAL_MODULES), "пропал модуль кухонного комплекса"
         for key in R.REAL_MODULES:
             m = R.build(key)
             assert m.parts, f"{key}: нет деталей"
@@ -350,6 +353,12 @@ class TestBendSemantics:
         from core.geometry import bend_deduction
         BD = bend_deduction(1.0, 90)
         for key in R.REAL_MODULES:
+            # Электрошкаф — другой производитель/станок: аддитивная модель гиба
+            # (вычет ≈ 0, offset == nominal), калибровка по своему эталону
+            # (см. core/electrical_cabinet). Инвариант кухонного цеха к нему
+            # не применяется — правится, когда придут параметры станка.
+            if key.startswith("ecab"):
+                continue
             m = R.build(key)
             parts = list(m.parts) + [p for s in m.subassemblies for p in s.parts]
             for p in parts:
@@ -373,3 +382,141 @@ class TestBendSemantics:
         assert b.offset == pytest.approx(17.8, abs=0.05), (
             "линия гиба должна стоять на 17.8, иначе цех загнёт не там"
         )
+
+
+class TestElectricalCabinet:
+    """
+    Электрошкаф 400x445x150 (1.2мм) — калибровка по эталону мастера
+    400х445.dxf. Дверь-развёртка эталона = 430.5 x 471 (все три варианта).
+    Тест держит совпадение размеров при будущих правках.
+    """
+
+    def test_шкаф_собирается_из_10_деталей(self):
+        # Единое изделие: 7 общих деталей + 3 двери = 10 (как в эталоне).
+        from core import real_modules as R
+        m = R.build("ecab")
+        assert getattr(m, "cut_layout", False), "должен быть флаг единого раскроя"
+        assert len(m.parts) == 10, f"ожидалось 10 деталей, получено {len(m.parts)}"
+        names = [p.name for p in m.parts]
+        assert any("Корпус" in n for n in names)
+        assert any("Монтажная" in n for n in names)
+        assert sum("Дверь" in n for n in names) == 3, "должно быть 3 двери на выбор"
+        assert sum("Крышка" in n for n in names) == 2
+        assert sum("Полоска" in n for n in names) == 2
+
+    def test_развёртка_двери_совпадает_с_эталоном(self):
+        # Эталон мастера: дверь 430.5 x 471. Аддитивная модель даёт 431 x 471.
+        from core.electrical_cabinet import build_door
+        for dt in ("blank", "small", "big"):
+            d = build_door(400, 445, 1.2, dt)
+            assert d.width == pytest.approx(430.5, abs=1.0), \
+                f"дверь[{dt}] ширина {d.width} != эталон 430.5"
+            assert d.height == pytest.approx(471.0, abs=1.0), \
+                f"дверь[{dt}] высота {d.height} != эталон 471.0"
+
+    def test_большое_окно_270x330(self):
+        # Эталон большого окна: вырез ~270 x 330 при типовом шкафе.
+        from core.electrical_cabinet import build_door
+        d = build_door(400, 445, 1.2, "big")
+        rects = [c for c in d.cutouts if c.shape == "rect"]
+        assert rects, "у двери с большим окном нет прямоугольного выреза"
+        win = rects[0]
+        assert win.width == pytest.approx(270, abs=2)
+        assert win.height == pytest.approx(330, abs=2)
+
+    def test_малое_окно_квадратное_точки_по_серединам(self):
+        # Эталон: малое окно КВАДРАТНОЕ, 4 отверстия на серединах граней
+        # (а не прямоугольник с точками по углам). Проверяем на вытянутом шкафе.
+        from core.electrical_cabinet import build_door
+        d = build_door(200, 300, 1.2, "small")
+        win = [c for c in d.cutouts if c.shape == "rect"][0]
+        assert win.width == pytest.approx(win.height, abs=0.5), "малое окно должно быть квадратным"
+        holes = [c for c in d.cutouts if c.shape == "circle"]
+        assert len(holes) == 4
+        # Каждое отверстие лежит на оси окна (X=центр ИЛИ Y=центр) -> середина грани
+        for c in holes:
+            on_v = abs(c.x - win.x) < 0.5      # на вертикальной оси (верх/низ)
+            on_h = abs(c.y - win.y) < 0.5      # на горизонтальной оси (лево/право)
+            assert on_v or on_h, "отверстие окна должно быть на середине грани, не в углу"
+
+    def test_окно_не_вылезает_за_дверь(self):
+        # Баг-регресс: на мелком шкафу окно должно уменьшаться и помещаться
+        # внутрь двери с отступом от краёв, а не быть больше двери.
+        from core.electrical_cabinet import build_door
+        for W, H in [(200, 300), (250, 350), (400, 445)]:
+            for dt in ("big", "small"):
+                d = build_door(W, H, 1.2, dt)
+                for c in d.cutouts:
+                    if c.shape == "rect":
+                        assert c.x - c.width / 2 >= 5, f"{W}x{H}/{dt}: окно за левым краем"
+                        assert c.x + c.width / 2 <= d.width - 5, f"{W}x{H}/{dt}: окно за правым краем"
+                        assert c.y - c.height / 2 >= 5, f"{W}x{H}/{dt}: окно за низом"
+                        assert c.y + c.height / 2 <= d.height - 5, f"{W}x{H}/{dt}: окно за верхом"
+
+    def test_экспорт_обходит_занятый_файл(self, tmp_path):
+        # Если Раскрой.dxf открыт в АвтоКАД (Permission denied) — экспорт не
+        # падает, а сохраняет копию с меткой времени.
+        import os
+        from core.dxf_exporter import DXFExporter
+
+        class FakeDoc:
+            def saveas(self, fn):
+                if os.path.basename(fn) == "Раскрой.dxf":
+                    raise PermissionError("файл открыт")
+                open(fn, "w").close()
+
+        target = str(tmp_path / "Раскрой.dxf")
+        out = DXFExporter._safe_saveas(FakeDoc(), target)
+        assert out != target, "должен сохранить под другим именем"
+        assert out.endswith(".dxf") and os.path.exists(out)
+
+    def test_отверстия_панели_внутри_детали(self):
+        # Баг-регресс: отверстия монт. панели не должны уезжать за материал
+        # (в угловые лапки) на маленьком шкафу.
+        from core.electrical_cabinet import build_panel
+        for W, H in [(200, 300), (250, 350), (400, 445)]:
+            p = build_panel(W, H, 1.2)
+            for c in p.cutouts:
+                assert c.radius <= c.x <= p.width - c.radius, \
+                    f"{W}x{H}: отверстие по X вне детали ({c.x})"
+                assert c.radius <= c.y <= p.height - c.radius, \
+                    f"{W}x{H}: отверстие по Y вне детали ({c.y})"
+
+    def test_раскрой_в_формате_мастера(self, tmp_path):
+        # Единый DXF-раскрой: голая геометрия на слое "0" + метки гиба на
+        # тонком слое, БЕЗ текста/размеров/рамки (как эталон мастера).
+        import ezdxf
+        from core.electrical_cabinet import ElectricalCabinet
+        from core.dxf_exporter import DXFExporter
+
+        parts = ElectricalCabinet.showcase_parts(400, 445, 150, 1.2)
+        # 7 общих деталей (корпус, 2 крышки, панель, 2 полоски, кронштейн) + 3 двери
+        assert len(parts) == 10, "showcase = 7 общих деталей + 3 двери"
+
+        path = str(tmp_path / "раскрой.dxf")
+        DXFExporter.export_cut_layout(parts, path)
+        doc = ezdxf.readfile(path)
+        msp = doc.modelspace()
+
+        layers = {e.dxf.layer for e in msp}
+        assert "0" in layers, "контур реза должен быть на слое 0"
+        assert DXFExporter.THIN_BEND_LAYER in layers, "нет тонкого слоя гиба"
+
+        # Рез на слое "0" — только геометрия, БЕЗ текста и размеров (чистый рез)
+        cut = [e for e in msp if e.dxf.layer == "0"]
+        cut_types = {e.dxftype() for e in cut}
+        assert "TEXT" not in cut_types and "MTEXT" not in cut_types, \
+            "на слое реза не должно быть текста"
+        assert "DIMENSION" not in cut_types, "на слое реза не должно быть размеров"
+
+        # Подписи размеров — есть, но на ОТДЕЛЬНОМ слое (человеку, не станку)
+        labels = [e for e in msp if e.dxf.layer == "ПОДПИСИ"]
+        assert labels and all(e.dxftype() == "TEXT" for e in labels), \
+            "подписи деталей должны быть на слое ПОДПИСИ"
+
+        # Без аннотаций слой ПОДПИСИ не создаётся (рез абсолютно голый)
+        path2 = str(tmp_path / "раскрой_голый.dxf")
+        DXFExporter.export_cut_layout(parts, path2, annotate=False)
+        doc2 = ezdxf.readfile(path2)
+        assert not any(e.dxftype() in ("TEXT", "MTEXT") for e in doc2.modelspace()), \
+            "annotate=False -> раскрой без текста вообще"

@@ -44,12 +44,24 @@ class Config:
     
     # === ПУТИ ===
     CAD_DIR = 'cad'
+
+    # ПАПКИ ЗАКАЗОВ - основное место выгрузки. Внутри одна папка на заказ:
+    #   cad/orders/2026-07-16_Иванов_Секция-с-ящиками/
+    #       Раскрой.dxf, Чертежи.pdf, Спецификация.xlsx, Развёртки/ ...
+    # Раньше всё сыпалось в две общие папки (dxf/ и reports/) с именами,
+    # которые различались только секундами - при десятках заказов от разных
+    # людей найти нужный было невозможно (см. core/order_paths.py).
+    ORDERS_DIR = os.path.join(CAD_DIR, 'orders')
+
+    # Старые общие папки. Оставлены: в них лежат ранее выгруженные файлы,
+    # и в reports/ живёт общий индекс истории заказов (order_history.json).
     DXF_DIR = os.path.join(CAD_DIR, 'dxf')
     REPORTS_DIR = os.path.join(CAD_DIR, 'reports')
     TEMPLATES_DIR = 'templates'
-    
+
     # Создать папки при запуске
     @classmethod
     def init_dirs(cls):
-        for path in [cls.CAD_DIR, cls.DXF_DIR, cls.REPORTS_DIR, cls.TEMPLATES_DIR]:
+        for path in [cls.CAD_DIR, cls.ORDERS_DIR, cls.DXF_DIR,
+                     cls.REPORTS_DIR, cls.TEMPLATES_DIR]:
             os.makedirs(path, exist_ok=True)

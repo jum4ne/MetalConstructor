@@ -18,14 +18,13 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 from config import Config
-from core.sheet_metal import get_corners_needing_relief, build_outline_points
+from core.order_paths import order_file
 from core.exploded_view import build_cabinet_scene, draw_exploded_view
 from core.assembly_view import draw_assembly_views
 from core.spec_page import draw_spec_page, draw_project_spec_page
 from core.project_scene import build_project_scene, draw_project_scene_page
 from core.assembly_tree import build_assembly_tree
 from core.section_page import draw_section_divider
-from core.part_semantics import HIDDEN_NOTICE
 
 FONT_NAME = "Helvetica"
 _FONT_REGISTERED = False
@@ -379,506 +378,6 @@ def draw_title_block(c, x0, y0, fields):
     text(137, 1.3, f"Формат {fields['format']}", 6)
 
 
-def draw_tube_page(c, tube, page_size, code, quantity, mass_kg, company_name,
-                    sheet_num=1, sheets_total=1, paper_format="A4"):
-    """
-    Нарисовать страницу для отрезка профильной трубы - упрощённая схема
-    (труба это прямой погонаж, не плоская деталь, поэтому вместо контура
-    с вырезами рисуем схематичный отрезок с габаритной длиной + отдельно
-    сечение профиля со своими размерами).
-    """
-    page_w, page_h = page_size
-    margin_left, margin_right = 20 * mm, 5 * mm
-    margin_top, margin_bottom = 5 * mm, 5 * mm
-    title_h = 55 * mm
-
-    # --- Схематичный отрезок трубы (длинный тонкий прямоугольник) ---
-    bar_area_w = page_w - margin_left - margin_right - 20 * mm - 10 * mm  # +10мм воздуха справа
-    bar_h = 14 * mm
-    bar_scale = min(bar_area_w / tube.length, 1.0)
-    bar_w = tube.length * bar_scale
-
-    bar_x0 = margin_left + 20 * mm
-    bar_y0 = page_h - margin_top - 60 * mm
-
-    c.setLineWidth(0.6)
-    c.setStrokeColorRGB(0, 0, 0)
-    c.rect(bar_x0, bar_y0, bar_w, bar_h, fill=0, stroke=1)
-    # штриховка внутри - условное обозначение проката по ГОСТ (наклонные линии)
-    c.setLineWidth(0.25)
-    step = 6 * mm
-    x = bar_x0
-    while x < bar_x0 + bar_w:
-        c.line(max(x, bar_x0), bar_y0, min(x + bar_h, bar_x0 + bar_w), bar_y0 + bar_h)
-        x += step
-
-    draw_horizontal_dimension(c, bar_x0, bar_x0 + bar_w, bar_y0, 10 * mm, f"{tube.length}")
-
-    # --- Сечение профиля (маленький прямоугольник со своими размерами) ---
-    sec_scale = min(30 * mm / max(tube.profile_w, tube.profile_h), 3.0)
-    sec_w = tube.profile_w * sec_scale
-    sec_h = tube.profile_h * sec_scale
-    sec_x0 = margin_left + 20 * mm
-    sec_y0 = bar_y0 - 55 * mm
-
-    c.setLineWidth(0.6)
-    c.rect(sec_x0, sec_y0, sec_w, sec_h, fill=0, stroke=1)
-    # внутренний контур стенки трубы (труба полая) - смещён на толщину стенки
-    wall_scaled = tube.wall * sec_scale
-    if wall_scaled * 2 < min(sec_w, sec_h):
-        c.setLineWidth(0.3)
-        c.rect(sec_x0 + wall_scaled, sec_y0 + wall_scaled,
-               sec_w - 2 * wall_scaled, sec_h - 2 * wall_scaled, fill=0, stroke=1)
-
-    draw_horizontal_dimension(c, sec_x0, sec_x0 + sec_w, sec_y0, 10 * mm, f"{tube.profile_w}")
-    draw_vertical_dimension(c, sec_y0, sec_y0 + sec_h, sec_x0, 10 * mm, f"{tube.profile_h}")
-
-    c.setFont(FONT_NAME, 8)
-    c.drawString(sec_x0 + sec_w + 8 * mm, sec_y0 + sec_h / 2, f"Стенка {tube.wall}мм")
-    if tube.note:
-        c.drawString(sec_x0 + sec_w + 8 * mm, sec_y0 + sec_h / 2 - 6 * mm, f"({tube.note})")
-
-    # --- Внешняя рамка листа ---
-    c.setLineWidth(1.0)
-    c.rect(margin_left, margin_bottom, page_w - margin_left - margin_right,
-           page_h - margin_bottom - margin_top, fill=0, stroke=1)
-
-    # --- Штамп ---
-    stamp_x0 = page_w - margin_right - 185 * mm
-    draw_title_block(c, stamp_x0, margin_bottom, {
-        "code": code,
-        "name": tube.name,
-        "mass": f"{mass_kg:.2f}",
-        "scale": "б/м",  # труба без масштаба - условная схема
-        "qty": quantity,
-        "material": f"профиль {tube.profile_label}мм",
-        "company": company_name,
-        "sheet": sheet_num,
-        "sheets_total": sheets_total,
-        "format": paper_format,
-    })
-
-
-EDGE_RU = {'left': 'левая', 'right': 'правая', 'top': 'верхняя', 'bottom': 'нижняя'}
-
-
-def _wrap(text, max_chars):
-    """Простой перенос текста по словам (у reportlab.canvas нет авто-переноса)"""
-    words = text.split()
-    lines, cur = [], ""
-    for w in words:
-        trial = f"{cur} {w}".strip()
-        if len(trial) <= max_chars:
-            cur = trial
-        else:
-            if cur:
-                lines.append(cur)
-            cur = w
-    if cur:
-        lines.append(cur)
-    return lines
-
-
-def _draw_leader(c, x_from, y_from, x_to, y_to, text, font_name=None):
-    """Выноска: линия от точки на детали к тексту сбоку (полка + подпись)"""
-    c.setLineWidth(0.3)
-    c.setStrokeColorRGB(0, 0, 0)
-    c.line(x_from, y_from, x_to, y_to)
-    c.line(x_to, y_to, x_to + 4 * mm, y_to)   # полка выноски
-    c.setFont(font_name or FONT_NAME, 6.5)
-    c.setFillColorRGB(0, 0, 0)
-    c.drawString(x_to + 5 * mm, y_to - 0.8 * mm, text)
-
-
-def _draw_line_legend(c, x, y, has_bends=True, has_cutouts=False):
-    """
-    Легенда типов линий на листе развёртки.
-
-    Без неё цех не отличает контур реза от линии гиба - а это
-    принципиально разные операции (лазер vs гибочный станок).
-    """
-    rows = [("solid", "— контур реза (лазер)")]
-    if has_bends:
-        rows.append(("bend", "— линия гиба (не резать)"))
-    if has_cutouts:
-        rows.append(("axis", "— осевая выреза (не резать)"))
-
-    w = 50 * mm
-    h = 5 * mm + len(rows) * 4.2 * mm
-
-    c.setLineWidth(0.4)
-    c.setStrokeColorRGB(0, 0, 0)
-    c.setFillColorRGB(1, 1, 1)
-    c.rect(x, y - h, w, h, fill=1, stroke=1)
-
-    c.setFillColorRGB(0, 0, 0)
-    c.setFont(FONT_NAME, 6.5)
-    c.drawString(x + 1.5 * mm, y - 4 * mm, "ЛИНИИ:")
-
-    yy = y - 8 * mm
-    for kind, label in rows:
-        x1, x2 = x + 2 * mm, x + 12 * mm
-        if kind == "solid":
-            c.setDash()
-            c.setLineWidth(0.6)
-            c.setStrokeColorRGB(0, 0, 0)
-        elif kind == "bend":
-            c.setDash(2, 2)
-            c.setLineWidth(0.5)
-            c.setStrokeColorRGB(0.2, 0.4, 0.7)
-        else:
-            c.setDash(1, 2)
-            c.setLineWidth(0.25)
-            c.setStrokeColorRGB(0.7, 0, 0.5)
-        c.line(x1, yy, x2, yy)
-        c.setDash()
-        c.setStrokeColorRGB(0, 0, 0)
-        c.setFillColorRGB(0, 0, 0)
-        c.setFont(FONT_NAME, 6)
-        c.drawString(x + 13 * mm, yy - 1 * mm, label)
-        yy -= 4.2 * mm
-
-    c.setLineWidth(0.5)
-
-
-def draw_part_page(c, part, page_size, code, quantity, mass_kg, company_name,
-                    sheet_num=1, sheets_total=1, paper_format="A4"):
-    """
-    Чертёж детали - ПОЛНЫЙ набор данных для раскроя и сборки, без сокращений:
-
-      - контур РАЗВЁРТКИ (плоской заготовки под лазер/плазму), с угловыми
-        разделительными прорезями
-      - габарит развёртки (ширина/высота заготовки) - основные размеры
-      - габарит ГОТОВОЙ детали после гибки (отдельной строкой в таблице)
-      - все линии гиба: кромка, отступ, угол, направление
-      - все вырезы: координаты центра от базовых кромок, размеры/диаметр
-      - размер и расположение угловых релиз-прорезей
-      - толщина металла, допуски
-      - текстовое пояснение к детали
-      - обязательная надпись, если деталь скрыта в собранном изделии
-    """
-    page_w, page_h = page_size
-
-    # Отступы страницы ПОДОГНАНЫ под реальный ГОСТ-штамп: рамка листа отстоит
-    # от края на 20мм слева (место под подшивку) и 5мм с других сторон -
-    # это даёт ширину штампа ровно 185мм на листе А4 (210мм), как и положено.
-    margin_left = 20 * mm
-    margin_right = 5 * mm
-    margin_top = 5 * mm
-    margin_bottom = 5 * mm
-    title_h = 55 * mm  # точная высота штампа по ГОСТ 2.104 форма 1
-
-    # Блок технических данных под чертежом (таблица гибов/вырезов/пояснение).
-    # Он занимает место, поэтому сам контур детали ужимается - зато на листе
-    # есть ВСЁ, что нужно цеху, а не только габарит.
-    # Высота блока данных считается ПОД СОДЕРЖИМОЕ, а не фиксированно:
-    # таблица гибов теперь одноколоночная, и у детали с 4 гибами строк
-    # больше. При фиксированных 58мм текст вылезал за границу блока и
-    # налезал на штамп.
-    _n_bends = len([b for b in part.bend_lines if b.direction != 'seam'])
-    _n_cuts = len(part.cutouts)
-    DATA_BLOCK_H = (34 * mm
-                    + _n_bends * 3.8 * mm
-                    + ((_n_cuts + 1) // 2) * 3.6 * mm
-                    + (8 * mm if part.corner_relief else 0)
-                    + (9 * mm if part.description else 0))
-    DATA_BLOCK_H = max(46 * mm, min(DATA_BLOCK_H, 105 * mm))
-
-    DIM_SPACE_LEFT = 18 * mm
-    DIM_SPACE_BOTTOM = 14 * mm
-    AIR_GAP_RIGHT = 42 * mm     # запас справа под выноски к вырезам/гибам
-    AIR_GAP_TOP = 10 * mm
-
-    # Начало чертежа (левый нижний угол контура)
-    x0 = margin_left + DIM_SPACE_LEFT
-    y0 = margin_bottom + title_h + DATA_BLOCK_H + DIM_SPACE_BOTTOM
-
-    draw_area_w = (page_w - margin_right - AIR_GAP_RIGHT) - x0
-    draw_area_h = (page_h - margin_top - AIR_GAP_TOP) - y0
-
-    scale = min(draw_area_w / part.width, draw_area_h / part.height, 1.0)
-    if part.width * scale < 40 * mm and part.height * scale < 40 * mm:
-        scale = min(draw_area_w / part.width, draw_area_h / part.height)
-
-    draw_w = part.width * scale
-    draw_h = part.height * scale
-
-    # Защита: контур физически не может выйти за пределы листа
-    assert x0 + draw_w <= page_w - margin_right - AIR_GAP_RIGHT + 0.1, "контур впритык к правому краю (нет зазора)"
-    assert y0 + draw_h <= page_h - margin_top - AIR_GAP_TOP + 0.1, "контур впритык к верху (нет зазора)"
-
-    # --- Заголовок: это РАЗВЁРТКА, а не готовая деталь ---
-    c.setFont(FONT_NAME, 9)
-    c.setFillColorRGB(0, 0, 0)
-    header = "Развёртка (плоская заготовка под резку)" if part.is_bent else "Плоская деталь (гибка не требуется)"
-    c.drawString(margin_left + 2 * mm, page_h - margin_top - 6 * mm, header)
-
-    # --- Контур детали (с угловыми прорезями, если есть) ---
-    corners = get_corners_needing_relief(part)
-    notch = part.corner_relief * scale if corners else 0
-    if corners:
-        pts = build_outline_points(x0, y0, draw_w, draw_h, corners, notch)
-    else:
-        pts = [(x0, y0), (x0 + draw_w, y0), (x0 + draw_w, y0 + draw_h), (x0, y0 + draw_h), (x0, y0)]
-
-    c.setLineWidth(0.6)
-    c.setStrokeColorRGB(0, 0, 0)
-    path = c.beginPath()
-    path.moveTo(*pts[0])
-    for p in pts[1:]:
-        path.lineTo(*p)
-    c.drawPath(path, fill=0, stroke=1)
-
-    # --- Линии гиба (пунктир) + подпись угла прямо у линии ---
-    c.setDash(2, 2)
-    for bend in part.bend_lines:
-        if bend.direction == 'seam':
-            continue
-        c.setStrokeColorRGB(0.2, 0.4, 0.7)
-        off = bend.offset * scale
-        if bend.edge == 'left':
-            bx = x0 + off
-            c.line(bx, y0, bx, y0 + draw_h)
-            lx, ly = bx, y0 + draw_h * 0.72
-        elif bend.edge == 'right':
-            bx = x0 + draw_w - off
-            c.line(bx, y0, bx, y0 + draw_h)
-            lx, ly = bx, y0 + draw_h * 0.72
-        elif bend.edge == 'top':
-            by = y0 + draw_h - off
-            c.line(x0, by, x0 + draw_w, by)
-            lx, ly = x0 + draw_w * 0.72, by
-        else:
-            by = y0 + off
-            c.line(x0, by, x0 + draw_w, by)
-            lx, ly = x0 + draw_w * 0.72, by
-        c.setDash()
-        c.setFillColorRGB(0.2, 0.4, 0.7)
-        c.setFont(FONT_NAME, 6)
-        # Раньше писали "R20 90°". Завод читал R как РАДИУС ГИБА - а это
-        # ОТСТУП ЛИНИИ ГИБА ОТ КРОМКИ. Пишем словом, без двусмысленности.
-        arrow = "вниз" if bend.direction == "down" else "вверх"
-        # Подпись у линии держим КОРОТКОЙ: на детали с 4 гибами длинные
-        # подписи налезали друг на друга. Подробности - в таблице внизу.
-        c.drawString(lx + 1 * mm, ly + 1 * mm,
-                     f"гиб {bend.offset:g} ({bend.angle:.0f}°)")
-        c.setDash(2, 2)
-    c.setDash()
-    c.setStrokeColorRGB(0, 0, 0)
-    c.setFillColorRGB(0, 0, 0)
-
-    # --- Вырезы + выноски с координатами ---
-    leader_x = x0 + draw_w + 6 * mm
-    # Легенда линий занимает правый верхний угол листа. Выноски начинаем
-    # НИЖЕ неё, иначе текст выноски налезает на текст легенды (поймано
-    # автотестом на пересечение строк).
-    legend_bottom = page_h - margin_top - 8 * mm - (5 * mm + 3 * 4.2 * mm)
-    leader_top = min(y0 + draw_h, legend_bottom - 4 * mm)
-    for i, cutout in enumerate(part.cutouts):
-        cx = x0 + cutout.x * scale
-        cy = y0 + cutout.y * scale
-        c.setStrokeColorRGB(0.7, 0, 0.5)
-        if cutout.shape == 'rect':
-            hw, hh = cutout.width * scale / 2, cutout.height * scale / 2
-            c.rect(cx - hw, cy - hh, hw * 2, hh * 2, fill=0, stroke=1)
-            # осевые линии выреза (база для замера)
-            c.setDash(1, 2)
-            c.setLineWidth(0.25)
-            c.line(cx - hw - 2 * mm, cy, cx + hw + 2 * mm, cy)
-            c.line(cx, cy - hh - 2 * mm, cx, cy + hh + 2 * mm)
-            c.setDash()
-            label = f"Выр.{i+1}: {cutout.width:g}x{cutout.height:g}"
-            edge_pt = (cx + hw, cy + hh)
-        else:
-            r = cutout.radius * scale
-            c.circle(cx, cy, r, fill=0, stroke=1)
-            c.setDash(1, 2)
-            c.setLineWidth(0.25)
-            c.line(cx - r - 2 * mm, cy, cx + r + 2 * mm, cy)
-            c.line(cx, cy - r - 2 * mm, cx, cy + r + 2 * mm)
-            c.setDash()
-            label = f"Выр.{i+1}: ⌀{cutout.radius*2:g}"
-            edge_pt = (cx + r * 0.7, cy + r * 0.7)
-        c.setStrokeColorRGB(0, 0, 0)
-        # Выноски рисуем только для первых 6 вырезов - иначе на детали с 6+
-        # вент. отверстиями лист превращается в кашу. Полные координаты ВСЕХ
-        # вырезов всё равно есть в таблице ниже, так что данные не теряются.
-        if i < 6:
-            ly = leader_top - (i + 1) * 5.5 * mm
-            _draw_leader(c, edge_pt[0], edge_pt[1], leader_x, ly, label)
-
-    # --- Угловая релиз-прорезь: выноска с размером ---
-    if corners:
-        # Выноску ведём от БЛИЖАЙШЕГО К ТЕКСТУ угла (текст всегда справа).
-        # Раньше брали corners[0] = 'bottom-left', а текст рисуется справа
-        # вверху - выноска прочерчивала ДИАГОНАЛЬ ЧЕРЕЗ ВСЮ ДЕТАЛЬ, и цех
-        # принимал её за линию реза. Берём правый верхний угол, если он есть.
-        corner = next((k for k in ("top-right", "bottom-right",
-                                   "top-left", "bottom-left") if k in corners),
-                      corners[0])
-        px = x0 + (notch if 'left' in corner else draw_w - notch)
-        py = y0 + (notch if 'bottom' in corner else draw_h - notch)
-        ly = leader_top - (min(len(part.cutouts), 6) + 1) * 5.5 * mm
-        _draw_leader(c, px, py, leader_x, ly,
-                     f"Релиз-прорезь {part.corner_relief:g}x{part.corner_relief:g} "
-                     f"({len(corners)} угл.)")
-
-    # --- Габаритные размеры РАЗВЁРТКИ ---
-    draw_horizontal_dimension(c, x0, x0 + draw_w, y0, 9 * mm, f"{int(part.width)}")
-    draw_vertical_dimension(c, y0, y0 + draw_h, x0, 9 * mm, f"{int(part.height)}")
-
-    # ------------------------------------------------------------------
-    # ЛЕГЕНДА ЛИНИЙ (правый верхний угол)
-    # ------------------------------------------------------------------
-    # Завод спросил: "пунктирная линия что показывает?" - и был прав:
-    # пунктир на листе есть, а расшифровки не было. Цех не должен гадать,
-    # что резать, а что гнуть: ошибка здесь = запоротая деталь.
-    _draw_line_legend(c, page_w - margin_right - 52 * mm,
-                      page_h - margin_top - 8 * mm,
-                      has_bends=bool([b for b in part.bend_lines
-                                      if b.direction != 'seam']),
-                      has_cutouts=bool(part.cutouts))
-
-    # ------------------------------------------------------------------
-    # БЛОК ТЕХНИЧЕСКИХ ДАННЫХ (под чертежом, над штампом)
-    # ------------------------------------------------------------------
-    bx0 = margin_left
-    bx1 = page_w - margin_right
-    by_top = margin_bottom + title_h + DATA_BLOCK_H
-    y = by_top
-
-    c.setLineWidth(0.5)
-    c.setStrokeColorRGB(0, 0, 0)
-    c.line(bx0, y, bx1, y)
-
-    y -= 5 * mm
-    c.setFont(FONT_NAME, 7.5)
-    c.setFillColorRGB(0, 0, 0)
-
-    # Строка 1: размеры (развёртка / готовая деталь) + материал + допуск
-    c.drawString(bx0 + 2 * mm, y,
-                 f"Развёртка (заготовка): {int(part.flat_width)} x {int(part.flat_height)} мм")
-    c.drawString(bx0 + 78 * mm, y,
-                 f"Готовая деталь: {int(part.formed_width)} x {int(part.formed_height)} мм")
-    c.drawString(bx0 + 148 * mm, y, f"S = {part.thickness} мм")
-    y -= 4.5 * mm
-    c.drawString(bx0 + 2 * mm, y,
-                 "Допуск на линейные размеры ±0,5 мм; на отверстия под крепёж H12; "
-                 "кромки без заусенцев")
-
-    # Строка: направление проката (нерж. лист имеет направление шлифовки)
-    y -= 4.5 * mm
-    c.drawString(bx0 + 2 * mm, y,
-                 "Направление шлифовки/волокна — вдоль длинной стороны заготовки "
-                 "(если сталь шлифованная)")
-
-    # --- Таблица гибов ---
-    y -= 6 * mm
-    bends = [b for b in part.bend_lines if b.direction != 'seam']
-    seams = [b for b in part.bend_lines if b.direction == 'seam']
-
-    if bends:
-        c.setFont(FONT_NAME, 7)
-        # Явно говорим, ОТ ЧЕГО отступ и что значит направление - завод
-        # не должен додумывать.
-        c.drawString(bx0 + 2 * mm, y,
-                     "ГИБЫ (линия гиба — от кромки ЗАГОТОВКИ; борт после "
-                     "гибки больше на вычет 2.2 мм):")
-        # ОДНА колонка, не две. Раньше строки раскладывались в 2 колонки по
-        # 88мм, но после уточнения формулировок строка выросла до ~95 знаков
-        # и в колонку не влезала - соседние строки НАЛЕЗАЛИ ДРУГ НА ДРУГА,
-        # таблицу нельзя было прочитать. Ширины листа хватает на одну
-        # колонку с запасом, поэтому просто идём построчно.
-        c.setFont(FONT_NAME, 6.5)
-        yy = y - 3.8 * mm          # сдвиг от заголовка (раньше его не было,
-                                   # и первая строка налезала на слово "ГИБЫ")
-        for i, b in enumerate(bends):
-            nom = (f", борт после гибки {b.nominal:g} мм"
-                   if getattr(b, "nominal", 0) else "")
-            c.drawString(bx0 + 4 * mm, yy,
-                         f"{i+1}) кромка {EDGE_RU.get(b.edge, b.edge)}: "
-                         f"линия гиба {b.offset:g} мм от кромки{nom}, "
-                         f"угол {b.angle:.0f}°, отгиб "
-                         f"{'вниз' if b.direction == 'down' else 'вверх'}"
-                         + (f" — {b.note}" if b.note else ""))
-            yy -= 3.8 * mm
-        y = yy - 1.5 * mm
-    if seams:
-        c.setFont(FONT_NAME, 6.5)
-        c.drawString(bx0 + 2 * mm, y, f"ШВЫ (сварка, не гнуть): {len(seams)} шт.")
-        y -= 4 * mm
-
-    # --- Таблица вырезов (координаты от левой нижней базовой кромки) ---
-    if part.cutouts:
-        c.setFont(FONT_NAME, 7)
-        c.drawString(bx0 + 2 * mm, y, "ВЫРЕЗЫ (координаты центра от левой нижней кромки):")
-        c.setFont(FONT_NAME, 6.5)
-        yy = y
-        for i, ct in enumerate(part.cutouts):
-            col = i % 2
-            if col == 0:
-                yy -= 3.6 * mm
-            xoff = 4 * mm + col * 88 * mm
-            if ct.shape == 'rect':
-                spec = f"{ct.width:g}x{ct.height:g} мм"
-            else:
-                spec = f"⌀{ct.radius*2:g} мм"
-            c.drawString(bx0 + xoff, yy,
-                         f"{i+1}) X={ct.x:g}  Y={ct.y:g}  {spec}"
-                         + (f"  {ct.label}" if ct.label else ""))
-        y = yy - 4.5 * mm
-
-    # --- Угловые релиз-прорези ---
-    if corners:
-        c.setFont(FONT_NAME, 6.5)
-        c.drawString(bx0 + 2 * mm, y,
-                     f"УГЛОВЫЕ РЕЛИЗ-ПРОРЕЗИ: {part.corner_relief:g}x{part.corner_relief:g} мм "
-                     f"в углах: {', '.join(corners)} — режутся вместе с контуром, "
-                     f"разделяют смежные борта")
-        y -= 4.5 * mm
-
-    # --- Пояснение к детали ---
-    if part.description:
-        c.setFont(FONT_NAME, 7)
-        c.drawString(bx0 + 2 * mm, y, "НАЗНАЧЕНИЕ:")
-        c.setFont(FONT_NAME, 6.5)
-        for line in _wrap(part.description, 145)[:2]:
-            y -= 3.6 * mm
-            c.drawString(bx0 + 4 * mm, y, line)
-        y -= 4 * mm
-
-    # --- Обязательная надпись о скрытости ---
-    if part.is_hidden_in_assembly:
-        c.setFont(FONT_NAME, 8)
-        c.setFillColorRGB(0, 0, 0)
-        notice_y = margin_bottom + title_h + 3 * mm
-        c.setLineWidth(0.7)
-        c.rect(bx0 + 2 * mm, notice_y - 1.5 * mm,
-               bx1 - bx0 - 4 * mm, 6.5 * mm, fill=0, stroke=1)
-        c.drawCentredString((bx0 + bx1) / 2, notice_y + 1 * mm, HIDDEN_NOTICE.upper())
-
-    # --- Внешняя рамка листа (тоже часть ГОСТ-оформления) ---
-    c.setLineWidth(1.0)
-    c.setStrokeColorRGB(0, 0, 0)
-    c.rect(margin_left, margin_bottom, page_w - margin_left - margin_right,
-           page_h - margin_bottom - margin_top, fill=0, stroke=1)
-
-    # --- Штамп (правый нижний угол, точная сетка ГОСТ 2.104) ---
-    stamp_x0 = page_w - margin_right - 185 * mm
-    draw_title_block(c, stamp_x0, margin_bottom, {
-        "code": code,
-        "name": part.name,
-        "mass": f"{mass_kg:.2f}",
-        "scale": f"1:{max(1, round(1/scale))}" if scale < 1 else "1:1",
-        "qty": quantity,
-        "material": f"сталь S={part.thickness}мм",
-        "company": company_name,
-        "sheet": sheet_num,
-        "sheets_total": sheets_total,
-        "format": paper_format,
-    })
-
-
 class TechnicalDrawingExporter:
     """
     Генерация комплекта конструкторской документации.
@@ -931,7 +430,7 @@ class TechnicalDrawingExporter:
         _register_font()
         Config.init_dirs()
         version = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time()*1000) % 1000:03d}"
-        filename = os.path.join(Config.REPORTS_DIR, f"chertezhi_{version}.pdf")
+        filename = order_file(module, "Чертежи.pdf")
 
         root = build_assembly_tree(module)
         is_project = root.node_type == "complex"
@@ -1258,13 +757,17 @@ def render_assembly_section(node, ctx, level=1, section_label=None):
 
     # --- 5. Чертежи листовых деталей ТОЛЬКО этого узла ---
     from core.rules import Rules
+    # Лист детали в стиле мастера (ЕСКД, без текстовых блоков). Импорт
+    # локальный: detail_sheet импортирует technical_drawing, а модульный
+    # импорт наверху дал бы циклическую зависимость.
+    from core.detail_sheet import draw_detail_sheet
 
     for idx, data in enumerate(node.grouped_parts(), 1):
         part = data["part"]
         qty = data["qty"]
         mass = part.area * qty * Rules.STEEL_DENSITY * part.thickness
         page = ctx.next_page()
-        draw_part_page(
+        draw_detail_sheet(
             c, part, A4, node.part_code(idx, ctx.code_prefix), qty, mass,
             ctx.company_name, sheet_num=page, sheets_total=ctx.total_pages,
             paper_format="A4",
@@ -1287,7 +790,11 @@ def render_assembly_section(node, ctx, level=1, section_label=None):
         mass = volume_m3 * Rules.STEEL_DENSITY * 1000 * qty
 
         page = ctx.next_page()
-        draw_tube_page(
+        # Лист трубы — в едином стиле с листами деталей (рамка ЕСКД, левая
+        # колонка, обозначение-уголок, легенда). Старый draw_tube_page рисовал
+        # «голую» страницу без этого оформления и выбивался из комплекта.
+        from core.detail_sheet import draw_tube_sheet
+        draw_tube_sheet(
             c, tube, A4, node.part_code(tube_index, ctx.code_prefix), qty, mass,
             ctx.company_name, sheet_num=page, sheets_total=ctx.total_pages,
             paper_format="A4",

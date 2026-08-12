@@ -1,0 +1,283 @@
+{
+  "filename": "cad\\dxf\\Проект кухни_20260716_163825.dxf",
+  "module_name": "К 01",
+  "module_type": "Проект кухни",
+  "sheets_count": 8,
+  "parts_count": 79,
+  "split_parts_count": 0,
+  "sheet_area_m2": 25.0,
+  "parts_area_m2": 18.083,
+  "usage_percent": 72.33,
+  "waste_percent": 27.67,
+  "metal_cost_rub": 21699.74,
+  "work_cost_rub": 11850,
+  "total_cost_rub": 33549.74,
+  "parts": [
+    {
+      "name": "[Фартук] Защитный фартук",
+      "width": 1077,
+      "height": 750,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция под мойку] Панель задняя",
+      "width": 818,
+      "height": 958,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Панель задняя",
+      "width": 815,
+      "height": 916,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Вытяжка] Деталь №1. S=1. Передняя",
+      "width": 1005,
+      "height": 712,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Дно",
+      "width": 996,
+      "height": 594,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция под мойку] Дно",
+      "width": 996,
+      "height": 571,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Вытяжка] Деталь №4",
+      "width": 1112,
+      "height": 500,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Панель боковая правая",
+      "width": 675,
+      "height": 820,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Панель боковая левая",
+      "width": 675,
+      "height": 820,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Декоративная накладка",
+      "width": 1078,
+      "height": 491,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с выдвижными ящиками] Боковая панель",
+      "width": 613,
+      "height": 820,
+      "thickness": 1.0,
+      "quantity": 2
+    },
+    {
+      "name": "[Секция под мойку] Панель боковая",
+      "width": 613,
+      "height": 820,
+      "thickness": 1.0,
+      "quantity": 2
+    },
+    {
+      "name": "[Вытяжка] Деталь №3. S=1. Задняя",
+      "width": 1005,
+      "height": 500,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Накладка",
+      "width": 504,
+      "height": 890,
+      "thickness": 2.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Вытяжка] Деталь №2. S=1. Левая",
+      "width": 641,
+      "height": 690,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Вытяжка] Деталь №2. S=1. Правая",
+      "width": 641,
+      "height": 690,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с выдвижными ящиками] Корпус ящика",
+      "width": 686,
+      "height": 641,
+      "thickness": 1.0,
+      "quantity": 4
+    },
+    {
+      "name": "[Секция под мойку] Панель декоративная на фасад",
+      "width": 535,
+      "height": 785,
+      "thickness": 1.0,
+      "quantity": 2
+    },
+    {
+      "name": "[Секция под мойку] Панель на фасад с ручкой",
+      "width": 846,
+      "height": 495,
+      "thickness": 1.0,
+      "quantity": 2
+    },
+    {
+      "name": "[Секция с выдвижными ящиками] Задняя стенка",
+      "width": 814,
+      "height": 457,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с выдвижными ящиками] Дно",
+      "width": 495,
+      "height": 571,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Передняя стенка мангала",
+      "width": 963,
+      "height": 293,
+      "thickness": 2.0,
+      "quantity": 2
+    },
+    {
+      "name": "[Секция с мангалом] Корпус для золы. Задняя часть",
+      "width": 307,
+      "height": 910,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Корпус для золы. Боковая правая",
+      "width": 468,
+      "height": 387,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Корпус для золы. Боковая левая",
+      "width": 468,
+      "height": 387,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Боковая стенка мангала",
+      "width": 586,
+      "height": 303,
+      "thickness": 2.0,
+      "quantity": 2
+    },
+    {
+      "name": "[Секция с мангалом] Корпус для золы. Передняя часть",
+      "width": 193,
+      "height": 910,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Корпус ящика для золы",
+      "width": 376,
+      "height": 383,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с выдвижными ящиками] Панель ящик выдвижной",
+      "width": 237,
+      "height": 496,
+      "thickness": 1.0,
+      "quantity": 4
+    },
+    {
+      "name": "[Секция с выдвижными ящиками] Декоративная накладка на панель для ящика выдвижного",
+      "width": 536,
+      "height": 175,
+      "thickness": 1.0,
+      "quantity": 4
+    },
+    {
+      "name": "[Секция с мангалом] Стенка мангала",
+      "width": 1114,
+      "height": 80,
+      "thickness": 2.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Стенка мангала №2",
+      "width": 1114,
+      "height": 80,
+      "thickness": 2.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Поперечная направляющая",
+      "width": 890,
+      "height": 50,
+      "thickness": 2.0,
+      "quantity": 6
+    },
+    {
+      "name": "[Секция с выдвижными ящиками] Направляющая",
+      "width": 493,
+      "height": 76,
+      "thickness": 1.0,
+      "quantity": 8
+    },
+    {
+      "name": "[Секция с мангалом] Фасад выдвижного ящика для золы",
+      "width": 280,
+      "height": 115,
+      "thickness": 1.0,
+      "quantity": 1
+    },
+    {
+      "name": "[Секция с мангалом] Продольная направляющая",
+      "width": 504,
+      "height": 50,
+      "thickness": 2.0,
+      "quantity": 9
+    },
+    {
+      "name": "[Фартук] Проушина для крепления. S=2мм",
+      "width": 30,
+      "height": 40,
+      "thickness": 2.0,
+      "quantity": 4
+    },
+    {
+      "name": "[Вытяжка] Проушина для крепления. S=2мм",
+      "width": 30,
+      "height": 40,
+      "thickness": 2.0,
+      "quantity": 4
+    }
+  ]
+}

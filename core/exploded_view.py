@@ -255,18 +255,21 @@ def draw_exploded_view(c, plates, rods, page_size, title, company_name,
         x2, y2 = to_paper(*p2)
         c.line(x1, y1, x2, y2)
 
-    # --- Панели - заливка по типу детали + контур ---
-    for p in plates:
-        pts3d = p.exploded_corners(1.0)
-        pts2d = [to_paper(*pt) for pt in pts3d]
-
+    # --- Панели: чистая светло-серая заливка + чёрный контур, БЕЗ цветовой
+    #     каши. Рисуем от дальних к ближним (painter's algorithm), чтобы
+    #     ближние детали аккуратно перекрывали дальние. ---
+    def _plate_depth(pl):
+        cx3, cy3, cz3 = pl.center_3d(1.0)
+        return cx3 - cy3
+    for p in sorted(plates, key=_plate_depth):
+        pts2d = [to_paper(*pt) for pt in p.exploded_corners(1.0)]
         path = c.beginPath()
         path.moveTo(*pts2d[0])
         for pt in pts2d[1:]:
             path.lineTo(*pt)
         path.close()
-        c.setFillColorRGB(*get_panel_color(p.label))
-        c.setStrokeColorRGB(0.1, 0.1, 0.1)
+        c.setFillColorRGB(0.90, 0.90, 0.90)
+        c.setStrokeColorRGB(0, 0, 0)
         c.setLineWidth(0.7)
         c.drawPath(path, fill=1, stroke=1)
 

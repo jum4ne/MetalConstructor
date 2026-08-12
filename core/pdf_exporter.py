@@ -12,6 +12,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from config import Config
+from core.order_paths import order_file
 
 
 class PDFExporter:
@@ -22,7 +23,7 @@ class PDFExporter:
     def export(module, report=None):
         Config.init_dirs()
         version = time.strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(Config.REPORTS_DIR, f"spec_{version}.pdf")
+        filename = order_file(module, "Спецификация.pdf")
 
         # Если отчёт о раскрое не передан снаружи (например, пользователь жмёт
         # "Экспорт PDF" до того, как посчитал DXF) - считаем его сами.
@@ -138,7 +139,7 @@ class PDFExporter:
         """
         Config.init_dirs()
         version = time.strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(Config.REPORTS_DIR, f"bend_map_{version}.pdf")
+        filename = order_file(module, "Карта гибки.pdf")
 
         PDFExporter._register_font()
 

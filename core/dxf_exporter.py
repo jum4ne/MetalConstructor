@@ -9,10 +9,31 @@ import os
 import time
 import json
 from config import Config
+from core.order_paths import order_file
 from core.rules import Rules
 from core.part_splitter import split_part_if_needed
 from core.nesting import pack_parts
-from core.sheet_metal import get_corners_needing_relief, build_outline_points, rotate_corners
+from core.sheet_metal import (get_corners_needing_relief, build_outline_points,
+                              rotate_corners, get_corner_cuts, rotate_corner_cuts)
+
+
+# Символы вне cp1251 в DXF R2000 превращаются в escape \U+XXXX и читаются в
+# CAM цеха как мусор. Текст в модель попадает из билдеров (метки вырезов,
+# примечания к гибам), поэтому чистим ЛЮБОЙ текст перед записью в DXF.
+_DXF_REPL = {
+    '×': 'x', '⌀': 'диам.', '↻': '(поворот 90)',
+    '—': '-', '–': '-', '−': '-', '…': '...',
+}
+
+
+def _dxf_safe(s):
+    """cp1251-безопасный текст для DXF R2000 (без escape-последовательностей)."""
+    if not isinstance(s, str):
+        return s
+    for k, v in _DXF_REPL.items():
+        s = s.replace(k, v)
+    # Страховка: всё, что не влезает в cp1251, заменяем на '?', а не на escape.
+    return s.encode('cp1251', 'replace').decode('cp1251')
 
 
 class DXFExporter:
@@ -32,8 +53,15 @@ class DXFExporter:
         """
         Config.init_dirs()
 
+        # Электрошкаф (и любой модуль с флагом cut_layout) выгружается ЕДИНЫМ
+        # раскроем в формате мастера (голая геометрия всех деталей в ряд на
+        # слое "0" + метки гиба), а НЕ кухонной раскладкой на лист.
+        if getattr(module, "cut_layout", False):
+            return DXFExporter._export_cut_layout_order(module)
+
+        # Всё по заказу - в одну папку cad/orders/дата_заказчик_изделие/
         version = time.strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(Config.DXF_DIR, f"{module.module_type}_{version}.dxf")
+        filename = order_file(module, "Раскрой.dxf")
 
         # Версия формата R2000 (AC1015) и кодовая страница ANSI_1251 - взято
         # НЕ из памяти, а напрямую из заголовка реального референсного DXF
@@ -41,7 +69,14 @@ class DXFExporter:
         # R2007 включительно DXF хранит текст через кодовую страницу, а не
         # через UTF-8 - отсюда и cp1251 у референсных файлов.
         doc = ezdxf.new("R2000", setup=True)
+        # Кириллица в DXF R2000 хранится в кодовой странице, а не в UTF-8.
+        # МАЛО поставить только заголовок $DWGCODEPAGE: ezdxf кэширует
+        # encoding отдельно и без явного doc.encoding='cp1251' пишет текст в
+        # cp1252, а кириллицу — как escape-последовательности \U+04XX. Тогда
+        # CAM-софт цеха показывает имена слоёв/деталей как "\U+0421..." вместо
+        # «Системный слой». Ставим ОБА, чтобы файл был байт-в-байт как у мастера.
         doc.header['$DWGCODEPAGE'] = 'ANSI_1251'
+        doc.encoding = 'cp1251'
         msp = doc.modelspace()
 
         # Слои
@@ -90,11 +125,12 @@ class DXFExporter:
 
             y_sheet_offset += sheet_h + 300
 
-        doc.saveas(filename)
+        # Обойти занятый файл, если DXF открыт в АвтоКАД (Permission denied).
+        filename = DXFExporter._safe_saveas(doc, filename)
 
         report = DXFExporter._create_report(filename, module, sheets_data)
 
-        report_path = os.path.join(Config.REPORTS_DIR, f"report_{version}.json")
+        report_path = order_file(module, "Отчёт раскроя.json")
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
 
@@ -105,6 +141,241 @@ class DXFExporter:
             'report_path': report_path,
             'report': report
         }
+
+    @staticmethod
+    def _export_cut_layout_order(module):
+        """Выгрузка электрошкафа единым раскроем + отчёт, совместимый с UI."""
+        Config.init_dirs()
+        parts = list(module.parts)
+        # export_cut_layout сам обходит занятый файл (Permission denied, если
+        # DXF открыт в АвтоКАД) и возвращает реальный путь сохранения.
+        filename = DXFExporter.export_cut_layout(parts, order_file(module, "Раскрой.dxf"))
+
+        report = DXFExporter._cut_layout_report(filename, module, parts)
+        report_path = order_file(module, "Отчёт раскроя.json")
+        try:
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+        except PermissionError:
+            report_path = ""   # отчёт занят — не критично, DXF уже сохранён
+        DXFExporter._print_report(report)
+        return {'dxf_path': filename, 'report_path': report_path, 'report': report}
+
+    @staticmethod
+    def _cut_layout_report(filename, module, parts, gap=40):
+        """Отчёт для единого раскроя (нет листов — «виртуальный лист» = габарит
+        раскладки). Ключи те же, что ждёт UI/история заказов."""
+        parts_count = sum(p.quantity for p in parts)
+        parts_area = sum(p.area * p.quantity for p in parts)
+
+        total_w = sum(p.width for p in parts) + gap * max(len(parts) - 1, 0)
+        max_h = max((p.height for p in parts), default=0)
+        sheet_area = total_w * max_h / 1_000_000 if max_h else 0
+        usage = (parts_area / sheet_area * 100) if sheet_area else 0
+
+        metal_cost = parts_area * Rules.METAL_PRICE_PER_M2
+        work_cost = parts_count * Rules.WORK_PRICE_PER_PART
+
+        agg = {}
+        for p in parts:
+            key = (p.name, p.width, p.height, p.thickness)
+            agg[key] = agg.get(key, 0) + p.quantity
+
+        return {
+            'filename': filename,
+            'module_name': module.name,
+            'module_type': getattr(module, 'module_type', ''),
+            'sheets_count': 1,
+            'parts_count': parts_count,
+            'split_parts_count': 0,
+            'sheet_area_m2': round(sheet_area, 3),
+            'parts_area_m2': round(parts_area, 3),
+            'usage_percent': round(usage, 2),
+            'waste_percent': round(100 - usage, 2),
+            'metal_cost_rub': round(metal_cost, 2),
+            'work_cost_rub': round(work_cost, 2),
+            'total_cost_rub': round(metal_cost + work_cost, 2),
+            'parts': [
+                {'name': k[0], 'width': k[1], 'height': k[2], 'thickness': k[3], 'quantity': v}
+                for k, v in agg.items()
+            ],
+        }
+
+    @staticmethod
+    def export_parts_separately(module, out_dir=None):
+        """
+        Отдельный DXF на КАЖДУЮ деталь - как поставляет мастер (папка
+        «развертки dxf»: один файл = одна деталь).
+
+        В отличие от общего раскроя, здесь файл содержит ТОЛЬКО геометрию
+        реза (контур + отверстия) на слое «Системный слой», без текста,
+        линий гиба и рамки листа - точно как в эталонных файлах мастера.
+        Такой файл можно отдать в CAM как есть.
+
+        Returns: {'dir': путь_к_папке, 'files': [пути], 'count': N}
+        """
+        Config.init_dirs()
+        if out_dir is None:
+            # Развёртки кладём подпапкой внутрь папки заказа, рядом с раскроем
+            out_dir = order_file(module, "Развёртки")
+        os.makedirs(out_dir, exist_ok=True)
+
+        parts = getattr(module, "all_parts", None) or module.parts
+        files = []
+        for idx, part in enumerate(parts, 1):
+            doc = ezdxf.new("R2000", setup=True)
+            doc.header['$DWGCODEPAGE'] = 'ANSI_1251'
+            doc.encoding = 'cp1251'          # см. комментарий в export()
+            doc.layers.add("Системный слой", color=7, linetype="CONTINUOUS")
+            msp = doc.modelspace()
+
+            # Контур (со скруглениями/надрезами, если заданы) + вырезы + доп.
+            # прорези — общий рисовальщик. Слой реза "Системный слой" (формат
+            # per-part файлов кухонного мастера), без меток гиба (как было).
+            DXFExporter._draw_bare_part(msp, part, 0, 0, with_bend_marks=False,
+                                        cut_layer="Системный слой")
+
+            fname = _dxf_safe(f"{idx:02d} - {part.name}")
+            fname = "".join(ch for ch in fname if ch not in '\\/:*?"<>|').strip()
+            path = os.path.join(out_dir, f"{fname}.dxf")
+            doc.saveas(path)
+            files.append(path)
+
+        return {'dir': out_dir, 'files': files, 'count': len(files)}
+
+    @staticmethod
+    def _safe_saveas(doc, filename):
+        """
+        Сохранить DXF, а если файл ЗАНЯТ (открыт в АвтоКАД/КОМПАС — самая
+        частая причина Permission denied при повторном раскрое) — записать
+        рядом копию с меткой времени, чтобы экспорт не падал. Возвращает
+        путь, по которому файл реально сохранён.
+        """
+        try:
+            doc.saveas(filename)
+            return filename
+        except PermissionError:
+            base, ext = os.path.splitext(filename)
+            alt = f"{base}_{time.strftime('%H%M%S')}{ext}"
+            doc.saveas(alt)
+            return alt
+
+    # Тонкий слой меток гиба — имя ровно как в эталонных DXF мастера
+    # (проверено разбором 400х445.dxf/пожарный.dxf: слой "7-ТОНКАЯ-ТЕКСТ-02",
+    # на нём короткие L-штрихи гиба в углах). Контур реза — на слое "0".
+    THIN_BEND_LAYER = "7-ТОНКАЯ-ТЕКСТ-02"
+
+    @staticmethod
+    def export_cut_layout(parts, filename, gap=40, with_bend_marks=True,
+                          annotate=True):
+        """
+        Единый DXF-раскрой В ФОРМАТЕ МАСТЕРА: голая геометрия всех деталей,
+        разложенных в ряд, на слое "0" (контур+вырезы) + метки гиба на тонком
+        слое. Рез — только на слоях "0"/тонком (как эталоны мастера).
+
+        annotate=True — добавить подписи (имя детали + габарит) над каждой
+        деталью на ОТДЕЛЬНОМ слое "ПОДПИСИ". Это удобно человеку (видно, что
+        за деталь и её размер), а для станка слой можно погасить/не резать —
+        рез остаётся чистым на слое "0".
+
+        parts:    список Part (напр. ElectricalCabinet.showcase_parts()).
+        filename: куда сохранить .dxf.
+        Возвращает путь к файлу.
+        """
+        Config.init_dirs()
+        doc = ezdxf.new("R2000", setup=True)
+        doc.header['$DWGCODEPAGE'] = 'ANSI_1251'
+        doc.encoding = 'cp1251'          # см. комментарий в export()
+        if DXFExporter.THIN_BEND_LAYER not in doc.layers:
+            doc.layers.add(DXFExporter.THIN_BEND_LAYER, color=7,
+                           linetype="CONTINUOUS")
+        if annotate and "ПОДПИСИ" not in doc.layers:
+            doc.layers.add("ПОДПИСИ", color=3)   # зелёный, отдельно от реза
+        msp = doc.modelspace()
+
+        x = 0.0
+        for part in parts:
+            DXFExporter._draw_bare_part(msp, part, x, 0.0, with_bend_marks)
+            if annotate:
+                # Имя + габарит развёртки над деталью, на отдельном слое.
+                label = _dxf_safe(f"{part.name}  {int(part.width)}x{int(part.height)}")
+                msp.add_text(
+                    label, dxfattribs={'layer': 'ПОДПИСИ', 'height': 12, 'color': 3}
+                ).set_placement((x, part.height + 15))
+            x += part.width + gap
+
+        return DXFExporter._safe_saveas(doc, filename)
+
+    @staticmethod
+    def _draw_bare_part(msp, part, ox, oy, with_bend_marks=True, cut_layer='0'):
+        """
+        Нарисовать одну деталь голой геометрией, как у мастера: контур
+        (с угловыми вырезами/скруглениями, если есть) и вырезы на слое реза,
+        метки гиба короткими L-штрихами в углах на тонком слое.
+
+        cut_layer — слой контура/вырезов ("0" у электрошкафа, "Системный слой"
+        у кухонного комплекта — так у разных мастеров).
+        """
+        # Приоритет: явный контур детали (со скруглениями/надрезами) ->
+        # угловые релиз-вырезы -> простой прямоугольник.
+        if getattr(part, 'outline', None):
+            pts = [(ox + p[0], oy + p[1], p[2] if len(p) > 2 else 0)
+                   for p in part.outline]
+            msp.add_lwpolyline(pts, format='xyb', close=True,
+                               dxfattribs={'layer': cut_layer, 'color': 7})
+        else:
+            corners = get_corners_needing_relief(part)
+            cuts = get_corner_cuts(part) if corners else {}
+            if corners:
+                outline = build_outline_points(ox, oy, part.width, part.height, corners, cuts)
+            else:
+                outline = [(ox, oy), (ox + part.width, oy),
+                           (ox + part.width, oy + part.height),
+                           (ox, oy + part.height), (ox, oy)]
+            msp.add_lwpolyline(outline, dxfattribs={'layer': cut_layer, 'color': 7})
+
+        # Доп. вырезы сложной формы (пазы, прорези): полилинии на слое реза
+        for ec in getattr(part, 'extra_cuts', []):
+            ec_pts, ec_closed = (ec if isinstance(ec, tuple) else (ec, False))
+            pp = [(ox + p[0], oy + p[1], p[2] if len(p) > 2 else 0) for p in ec_pts]
+            msp.add_lwpolyline(pp, format='xyb', close=ec_closed,
+                               dxfattribs={'layer': cut_layer, 'color': 7})
+
+        # Вырезы (окно, замок, кабельные вводы) — тоже рез, на слое реза
+        for ct in getattr(part, 'cutouts', []):
+            cx, cy = ox + ct.x, oy + ct.y
+            if ct.shape == 'rect':
+                hw, hh = ct.width / 2, ct.height / 2
+                msp.add_lwpolyline(
+                    [(cx - hw, cy - hh), (cx + hw, cy - hh), (cx + hw, cy + hh),
+                     (cx - hw, cy + hh), (cx - hw, cy - hh)],
+                    dxfattribs={'layer': cut_layer, 'color': 7})
+            else:  # circle
+                msp.add_circle((cx, cy), ct.radius,
+                               dxfattribs={'layer': cut_layer, 'color': 7})
+
+        # Метки гиба: короткий L-штрих в каждом углу, где сходятся два гнутых
+        # борта (как в эталоне мастера). Длина штриха = позиция линии гиба.
+        if with_bend_marks:
+            off = {}
+            for b in getattr(part, 'bend_lines', []):
+                if b.direction != 'seam':
+                    off.setdefault(b.edge, b.offset)
+            W, H = part.width, part.height
+            # (угол cx,cy ; направление внутрь sx,sy ; кромка_x ; кромка_y)
+            corners_spec = [
+                (ox,     oy,     1,  1, 'left',  'bottom'),
+                (ox + W, oy,    -1,  1, 'right', 'bottom'),
+                (ox + W, oy + H, -1, -1, 'right', 'top'),
+                (ox,     oy + H,  1, -1, 'left',  'top'),
+            ]
+            for cx, cy, sx, sy, ex, ey in corners_spec:
+                if ex in off and ey in off:
+                    fx, fy = off[ex], off[ey]
+                    msp.add_line((cx, cy + sy * fy), (cx + sx * fx, cy + sy * fy),
+                                 dxfattribs={'layer': DXFExporter.THIN_BEND_LAYER})
+                    msp.add_line((cx + sx * fx, cy), (cx + sx * fx, cy + sy * fy),
+                                 dxfattribs={'layer': DXFExporter.THIN_BEND_LAYER})
 
     @staticmethod
     def _draw_part(msp, part_data, offset_y=0, part_number=1):
@@ -121,28 +392,35 @@ class DXFExporter:
         # рисуем не простой прямоугольник, а контур со срезанными углами,
         # там где два смежных загнутых борта иначе мешали бы друг другу.
         corners = get_corners_needing_relief(part)
+        cuts = get_corner_cuts(part) if corners else {}
         if rotated and corners:
             corners = rotate_corners(corners)
+            cuts = rotate_corner_cuts(cuts)
 
         if corners:
-            outline = build_outline_points(x, y, w, h, corners, part.corner_relief)
+            # Вырез в углу — прямоугольник до линий гиба смежных бортов:
+            # без него борта при гибке упираются друг в друга (проверено по
+            # эталону мастера). Габарит заготовки от этого не меняется.
+            outline = build_outline_points(x, y, w, h, corners, cuts)
         else:
             outline = [(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)]
 
         msp.add_lwpolyline(outline, dxfattribs={'layer': 'Системный слой', 'color': 7})
 
-        # Название детали
+        # Название детали. ВНИМАНИЕ: символы вне cp1251 (↻, ×, ⌀) в DXF R2000
+        # превращаются в escape \U+XXXX и в CAM цеха читаются как мусор,
+        # поэтому в подписях используем только cp1251-безопасные символы.
         label = f"{part_number}. {part.name}"
         if rotated:
-            label += " ↻"
+            label += " (поворот 90)"
 
         msp.add_text(
-            label, dxfattribs={'layer': 'TEXT', 'height': 15, 'color': 7}
+            _dxf_safe(label), dxfattribs={'layer': 'TEXT', 'height': 15, 'color': 7}
         ).set_placement((x + 10, y + h - 25))
 
-        # Размеры
+        # Размеры (× заменён на латинскую x — вне cp1251 × даёт escape)
         msp.add_text(
-            f"{int(w)}×{int(h)} мм",
+            f"{int(w)}x{int(h)} мм",
             dxfattribs={'layer': 'TEXT', 'height': 12, 'color': 3}
         ).set_placement((x + 10, y + h - 45))
 
@@ -176,20 +454,26 @@ class DXFExporter:
                 else:
                     cw, ch = cutout.width, cutout.height
                 hw, hh = cw / 2, ch / 2
+                # Вырезы/отверстия — это ТОЖЕ рез, поэтому кладём их на слой
+                # реза «Системный слой» вместе с контуром: команда «резать
+                # Системный слой» даёт готовую деталь с отверстиями, ничего
+                # не теряется. Раньше они лежали на отдельном слое CUTOUT, и
+                # при резке одного контура отверстия можно было пропустить.
                 msp.add_lwpolyline(
                     [
                         (cx - hw, cy - hh), (cx + hw, cy - hh),
                         (cx + hw, cy + hh), (cx - hw, cy + hh),
                         (cx - hw, cy - hh)
                     ],
-                    dxfattribs={'layer': 'CUTOUT', 'color': 6}
+                    dxfattribs={'layer': 'Системный слой', 'color': 7}
                 )
             elif cutout.shape == 'circle':
-                msp.add_circle((cx, cy), cutout.radius, dxfattribs={'layer': 'CUTOUT', 'color': 6})
+                msp.add_circle((cx, cy), cutout.radius,
+                               dxfattribs={'layer': 'Системный слой', 'color': 7})
 
             if cutout.label:
                 msp.add_text(
-                    cutout.label,
+                    _dxf_safe(cutout.label),
                     dxfattribs={'layer': 'TEXT', 'height': 8, 'color': 6}
                 ).set_placement((cx, cy - 6), align=TextEntityAlignment.MIDDLE_CENTER)
 
@@ -197,9 +481,9 @@ class DXFExporter:
             # тут был только текстовый ярлык ("Вырез под мойку") без цифр,
             # и резчику приходилось самому измерять прямоугольник на глаз.
             if cutout.shape == 'rect':
-                dims_text = f"{int(cw)}×{int(ch)} мм"
-            else:  # circle
-                dims_text = f"⌀{int(cutout.radius * 2)} мм"
+                dims_text = f"{int(cw)}x{int(ch)} мм"
+            else:  # circle — «диам.» вместо ⌀ (⌀ вне cp1251)
+                dims_text = f"диам.{int(cutout.radius * 2)} мм"
 
             msp.add_text(
                 dims_text,
@@ -230,7 +514,7 @@ class DXFExporter:
             if bend.note:
                 mid = ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
                 msp.add_text(
-                    bend.note,
+                    _dxf_safe(bend.note),
                     dxfattribs={'layer': 'BEND', 'height': 8, 'color': 4}
                 ).set_placement(mid)
 

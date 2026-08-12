@@ -173,3 +173,71 @@ class TestRegressions:
         ys = [p[1] for p in pts]
         assert min(xs) >= 100 and max(xs) <= 100 + w
         assert min(ys) >= 200 and max(ys) <= 200 + h
+
+    def test_детали_подсборок_попадают_в_раскрой_проекта(self):
+        """
+        Был баг: KitchenProject.parts брал только module.parts (свои детали
+        модуля) и НЕ спускался в подсборки. Из-за этого панели ящиков,
+        декоративные накладки и панели фасада (14 типов / 16 шт на комплексе
+        К 01) не попадали ни в общий DXF-раскрой, ни в массу/смету - цех
+        получал неполный комплект, масса занижалась на ~27%.
+        """
+        from core.kitchen_project import KitchenProject
+        from core import real_modules as R
+
+        proj = KitchenProject(name="тест подсборок")
+        for key in ("section_drawers", "section_sink"):
+            proj.add_module(R.build(key))
+
+        # в проект должно попасть СТОЛЬКО ЖЕ деталей, сколько реально есть
+        # в модулях вместе с их подсборками
+        expected_qty = sum(p.quantity for m in proj.modules for p in m.all_parts)
+        expected_types = sum(len(m.all_parts) for m in proj.modules)
+        assert proj.total_parts == expected_qty, (
+            f"детали подсборок потеряны: в проекте {proj.total_parts} шт, "
+            f"а в модулях {expected_qty} шт")
+        assert len(proj.parts) == expected_types
+
+        names = [p.name for p in proj.parts]
+        assert any("Панель ящик выдвижной" in n for n in names), "нет панелей ящиков"
+        assert any("на фасад с ручкой" in n for n in names), "нет панелей фасада"
+
+    def test_углы_освобождены_под_гибку_на_всём_комплексе(self):
+        """
+        Был баг: в углу вырезался квадратик 2.5мм, хотя металл в углу
+        принадлежит ОБОИМ смежным бортам (у «Дна» это 19x20мм). При гибке
+        второго борта углы упирались друг в друга - деталь мяло/рвало, и
+        слесарю приходилось вырезать 4 угла вручную на каждой коробчатой
+        детали. Эталон мастера (К 01.01.01.007 - Дно) вырезает угол ДО
+        ЛИНИЙ ГИБА. Вырез не увеличивает расход: он внутри габарита.
+        """
+        from core.kitchen_project import KitchenProject
+        from core import real_modules as R
+        from core.sheet_metal import get_corners_needing_relief, get_corner_cuts
+
+        PAIRS = {'bottom-left': ('left', 'bottom'), 'bottom-right': ('right', 'bottom'),
+                 'top-right': ('right', 'top'), 'top-left': ('left', 'top')}
+
+        proj = KitchenProject(name="тест углов")
+        for key in ("section_drawers", "section_sink", "section_grill", "apron", "hood"):
+            proj.add_module(R.build(key))
+
+        checked = 0
+        for part in proj.parts:
+            corners = get_corners_needing_relief(part)
+            if not corners:
+                continue
+            cuts = get_corner_cuts(part)
+            offs = {b.edge: b.offset for b in part.bend_lines if b.direction != 'seam'}
+            for corner in corners:
+                edge_x, edge_y = PAIRS[corner]
+                dx, dy = cuts[corner]
+                assert dx >= offs[edge_x] - 0.01, (
+                    f"{part.name}: вырез {corner} по X = {dx}, а борт {edge_x} "
+                    f"= {offs[edge_x]} -> борта столкнутся при гибке")
+                assert dy >= offs[edge_y] - 0.01, (
+                    f"{part.name}: вырез {corner} по Y = {dy}, а борт {edge_y} "
+                    f"= {offs[edge_y]} -> борта столкнутся при гибке")
+                checked += 1
+
+        assert checked >= 8, f"проверено лишь {checked} углов - тест ничего не поймал"

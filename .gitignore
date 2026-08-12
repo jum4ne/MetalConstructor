@@ -1,10 +1,28 @@
-# Python
+# === Python ===
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
 
-# PyInstaller build output
+# Виртуальное окружение — НЕ синхронизируем (у каждой машины своё)
+.venv/
+venv/
+env/
+
+# === PyInstaller (сборка exe) ===
 build/
 dist/
 *.spec
+
+# === Генерённые выгрузки (создаются программой, не код) ===
+cad/orders/
+cad/dxf/
+cad/reports/*.pdf
+
+# === Служебное / временное ===
+.agents/
+scratchpad/
+*.bak
+*.bak.*
+Thumbs.db
+desktop.ini

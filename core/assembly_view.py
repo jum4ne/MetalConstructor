@@ -106,17 +106,10 @@ def draw_assembly_views(c, module, page_size, title, company_name, code,
     dim_h_fn(c, fx0, fx0 + dw, fy0, 8 * mm, f"{int(W)}")
     dim_v_fn(c, fy0, fy0 + dh, fx0, 8 * mm, f"{int(H)}")
 
-    # номера: боковины по краям, двери в центре половин
-    if len(boковины) == 2:
-        _draw_pos_circle(c, fx0 + 4 * mm, fy0 + dh / 2, boковины[0][0], font_name)
-        _draw_pos_circle(c, fx0 + dw - 4 * mm, fy0 + dh / 2, boковины[1][0], font_name)
-    if len(dвери) == 2:
-        _draw_pos_circle(c, fx0 + dw * 0.25, fy0 + dh / 2, dвери[0][0], font_name)
-        _draw_pos_circle(c, fx0 + dw * 0.75, fy0 + dh / 2, dвери[1][0], font_name)
-    if крыша:
-        _draw_pos_circle(c, fx0 + dw / 2, fy0 + dh + 4 * mm, крыша[0][0], font_name)
-    if дно:
-        _draw_pos_circle(c, fx0 + dw / 2, fy0 - 12 * mm, дно[0][0], font_name)
+    # Номера позиций на этом листе НЕ ставим: здесь синтетическая коробка
+    # (боковины/крыша/дно), её номера не совпали бы с настоящей
+    # спецификацией. Позиции деталей показаны на разнесённом виде и в
+    # ведомости — сюда выносим только габариты и подсказку, куда смотреть.
 
     # ============ ВИД СВЕРХУ ============
     zx, zy, zw, zh = top_zone
@@ -131,11 +124,6 @@ def draw_assembly_views(c, module, page_size, title, company_name, code,
     c.drawString(zx, zy + zh + 3 * mm, "Вид сверху")
     dim_h_fn(c, tx0, tx0 + dw2, ty0, 8 * mm, f"{int(W)}")
     dim_v_fn(c, ty0, ty0 + dh2, tx0, 8 * mm, f"{int(D)}")
-    if крыша:
-        _draw_pos_circle(c, tx0 + dw2 / 2, ty0 + dh2 / 2, крыша[0][0], font_name)
-    if len(boковины) == 2:
-        _draw_pos_circle(c, tx0 + 4 * mm, ty0 + dh2 / 2, boковины[0][0], font_name)
-        _draw_pos_circle(c, tx0 + dw2 - 4 * mm, ty0 + dh2 / 2, boковины[1][0], font_name)
 
     # ============ ВИД СБОКУ ============
     zx, zy, zw, zh = side_zone
@@ -164,12 +152,11 @@ def draw_assembly_views(c, module, page_size, title, company_name, code,
     c.setDash()
     c.setStrokeColorRGB(0, 0, 0)
 
-    if len(boковины) >= 1:
-        _draw_pos_circle(c, sx0 + dw3 / 2, sy0 + dh3 / 2, boковины[0][0], font_name)
-    if крыша:
-        _draw_pos_circle(c, sx0 + dw3 / 2, sy0 + dh3 + 4 * mm, крыша[0][0], font_name)
-    if дно:
-        _draw_pos_circle(c, sx0 + dw3 / 2, sy0 - 12 * mm, дно[0][0], font_name)
+    # Подсказка: где искать номера позиций деталей.
+    c.setFont(font_name, 8)
+    c.setFillColorRGB(0, 0, 0)
+    c.drawString(margin_left + 3 * mm, page_h - margin_top - 14 * mm,
+                 "Номера позиций деталей — см. разнесённый вид и спецификацию.")
 
     # --- Внешняя рамка листа ---
     c.setLineWidth(1.0)

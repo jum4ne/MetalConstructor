@@ -15,6 +15,7 @@ import time
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from config import Config
+from core.order_paths import order_file
 
 CODE_PREFIX = "К 01"   # префикс обозначения (К - от "Кристалл")
 
@@ -89,7 +90,7 @@ class ExcelExporter:
     def export(module):
         Config.init_dirs()
         version = time.strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(Config.REPORTS_DIR, f"spec_{version}.xlsx")
+        filename = order_file(module, "Спецификация.xlsx")
 
         wb = Workbook()
         ExcelExporter._write_sheet_list(wb, module)

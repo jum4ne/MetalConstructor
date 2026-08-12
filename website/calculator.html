@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Калькулятор стоимости уличной кухни | TERRASA</title>
+  <meta name="description" content="Онлайн-калькулятор уличной кухни из нержавеющей стали: соберите комплект из модулей и узнайте ориентировочную стоимость за минуту." />
+  <meta name="theme-color" content="#17130f" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e1116'/%3E%3Cpath d='M8 21h16M8 16h16M8 11h16' stroke='%23d7a44f' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body id="top">
+<div id="siteHeader"></div>
+
+<main>
+  <section class="page-hero">
+    <div class="hero-bg" aria-hidden="true"></div>
+    <div class="container">
+      <p class="eyebrow">Онлайн-калькулятор</p>
+      <h1>Соберите комплект и узнайте цену</h1>
+      <p class="lead">Добавьте нужные секции — увидите ориентировочную стоимость сразу. Это предварительный расчёт: точную цену под ваш размер и комплектацию подтвердит менеджер после заявки.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="configurator">
+        <div class="config-catalog" id="configCatalog"></div>
+
+        <aside class="config-cart" id="configCart" aria-live="polite">
+          <h3>Ваш комплект</h3>
+          <ul class="cart-list" id="cartList">
+            <li class="cart-empty">Пока пусто. Добавьте секции слева&nbsp;👈</li>
+          </ul>
+          <div class="cart-summary">
+            <div class="cart-row"><span>Позиций</span><b id="cartCount">0</b></div>
+            <div class="cart-row cart-total"><span>Ориентировочно</span><b id="cartTotal">0&nbsp;₽</b></div>
+          </div>
+          <button class="btn btn-primary btn-block" id="cartOrder" disabled>Отправить заявку на расчёт</button>
+          <p class="cart-disclaimer">Расчёт предварительный и не является офертой. Финальную стоимость согласуем после замера/уточнения размеров.</p>
+        </aside>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="siteFooter"></div>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

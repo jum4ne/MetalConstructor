@@ -2,6 +2,8 @@
 Главное окно программы
 """
 import os
+import subprocess
+import sys
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -193,6 +195,12 @@ class MainWindow(QMainWindow):
             self.module_type.addItem(label, key)
         self.module_type.currentIndexChanged.connect(self._on_module_type_changed)
 
+        # Заказчик: попадает в имя папки заказа (cad/orders/дата_заказчик_изделие)
+        # и в историю. Раньше у модулей заказчика не было вообще - выгрузки
+        # разных людей сваливались в одну кучу с именами по секундам.
+        self.module_client_field = QLineEdit()
+        self.module_client_field.setPlaceholderText("ФИО клиента / номер заказа (необязательно)")
+
         self.height = QSpinBox()
         self.height.setRange(50, 5000)
         self.height.setValue(1800)
@@ -234,6 +242,7 @@ class MainWindow(QMainWindow):
         self.custom_sheet_height.setValue(Rules.SHEET_HEIGHT)
         self.custom_sheet_height.setSuffix(" мм")
 
+        params_layout.addRow("Заказчик", self.module_client_field)
         params_layout.addRow("Тип модуля", self.module_type)
         params_layout.addRow("Высота", self.height)
         params_layout.addRow("Ширина", self.width)
@@ -281,6 +290,15 @@ class MainWindow(QMainWindow):
         self.export_dxf_btn.setMinimumHeight(42)
         self.export_dxf_btn.setStyleSheet(theme.btn_style(theme.STEEL, theme.STEEL_LIGHT))
 
+        # Отдельный DXF на каждую деталь - как поставляет мастер (папка
+        # «развертки dxf»). Общий DXF выше - это раскрой на листы под резку,
+        # а этот - по одному файлу на деталь, только геометрия реза.
+        self.export_dxf_parts_btn = QPushButton("📤 DXF по деталям")
+        self.export_dxf_parts_btn.clicked.connect(self.export_dxf_parts)
+        self.export_dxf_parts_btn.setEnabled(False)
+        self.export_dxf_parts_btn.setMinimumHeight(42)
+        self.export_dxf_parts_btn.setStyleSheet(theme.btn_style(theme.STEEL, theme.STEEL_LIGHT))
+
         self.export_excel_btn = QPushButton("📊 Excel")
         self.export_excel_btn.clicked.connect(self.export_excel)
         self.export_excel_btn.setEnabled(False)
@@ -306,6 +324,7 @@ class MainWindow(QMainWindow):
         self.export_drawings_btn.setStyleSheet(theme.btn_style(theme.PURPLE, theme.PURPLE_HOVER))
 
         row1.addWidget(self.export_dxf_btn)
+        row1.addWidget(self.export_dxf_parts_btn)
         row1.addWidget(self.export_excel_btn)
         row1.addWidget(self.export_pdf_btn)
         row1.addWidget(self.export_bend_map_btn)
@@ -563,12 +582,18 @@ class MainWindow(QMainWindow):
         apply_status_btn.setStyleSheet(theme.btn_style(theme.STEEL, theme.STEEL_LIGHT))
         apply_status_btn.setMinimumHeight(40)
 
+        open_folder_btn = QPushButton("📁 Открыть папку заказа")
+        open_folder_btn.clicked.connect(self.open_selected_order_folder)
+        open_folder_btn.setStyleSheet(theme.btn_style(theme.STEEL, theme.STEEL_LIGHT))
+        open_folder_btn.setMinimumHeight(40)
+
         delete_order_btn = QPushButton("🗑️ Удалить заказ")
         delete_order_btn.clicked.connect(self.delete_selected_order)
         delete_order_btn.setStyleSheet(theme.btn_style(theme.DANGER, theme.DANGER_HOVER))
         delete_order_btn.setMinimumHeight(40)
 
         history_buttons.addWidget(refresh_history_btn)
+        history_buttons.addWidget(open_folder_btn)
         history_buttons.addWidget(self.status_combo)
         history_buttons.addWidget(apply_status_btn)
         history_buttons.addWidget(delete_order_btn)
@@ -668,6 +693,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", f"Неизвестный тип модуля: {module_key}")
             return
 
+        # Заказчик -> в модуль: по нему строится имя папки заказа
+        # (cad/orders/дата_заказчик_изделие) и запись в истории.
+        self.cabinet.client = self.module_client_field.text().strip()
+
         self.update_parts_table(self.cabinet.parts)
 
         self.info_label.setText(f"""
@@ -679,6 +708,7 @@ class MainWindow(QMainWindow):
         """)
 
         self.export_dxf_btn.setEnabled(True)
+        self.export_dxf_parts_btn.setEnabled(True)
         self.export_excel_btn.setEnabled(True)
         self.export_pdf_btn.setEnabled(True)
         self.export_bend_map_btn.setEnabled(True)
@@ -705,6 +735,25 @@ class MainWindow(QMainWindow):
 
         self.parts_table.resizeColumnsToContents()
 
+    def export_dxf_parts(self):
+        """Экспорт отдельного DXF на каждую деталь (папка «развертки»)"""
+
+        if not self.cabinet:
+            QMessageBox.warning(self, "Ошибка", "Сначала выполните расчёт!")
+            return
+
+        try:
+            res = DXFExporter.export_parts_separately(self.cabinet)
+            QMessageBox.information(
+                self, "Готово",
+                f"Сохранено файлов: {res['count']}\n\n"
+                f"Папка:\n{res['dir']}\n\n"
+                "В каждом файле — только геометрия реза одной детали "
+                "(контур и отверстия) на слое «Системный слой»."
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось выгрузить DXF по деталям:\n{e}")
+
     def export_dxf(self):
         """Экспорт в DXF"""
 
@@ -726,7 +775,7 @@ class MainWindow(QMainWindow):
             else:
                 add_record(
                     name=self.cabinet.name,
-                    client="",
+                    client=getattr(self.cabinet, 'client', ''),
                     module_type=self.cabinet.module_type,
                     report=result['report'],
                     dxf_path=result['dxf_path'],
@@ -1203,6 +1252,39 @@ class MainWindow(QMainWindow):
                 '_remote': True,
             })
         return normalized
+
+    def open_selected_order_folder(self):
+        """Открыть в проводнике папку выбранного заказа (со всеми выгрузками)"""
+
+        row = self.history_table.currentRow()
+        if row < 0 or row >= len(getattr(self, '_history_records', [])):
+            QMessageBox.warning(self, "Ошибка", "Выберите заказ в таблице истории.")
+            return
+
+        record = self._history_records[row]
+        dxf_path = record.get('dxf_path') or ''
+        folder = os.path.dirname(dxf_path) if dxf_path else ''
+
+        if not folder or not os.path.isdir(folder):
+            QMessageBox.warning(
+                self, "Папка не найдена",
+                "У этого заказа нет папки с выгрузками.\n\n"
+                "Возможно, он создан до перехода на папки заказов — "
+                "тогда файлы лежат в старых cad/dxf и cad/reports.\n"
+                "Сделайте экспорт заново, и всё соберётся в одну папку."
+            )
+            return
+
+        # Открыть системным файловым менеджером (Windows/macOS/Linux)
+        try:
+            if sys.platform.startswith('win'):
+                os.startfile(folder)
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', folder])
+            else:
+                subprocess.Popen(['xdg-open', folder])
+        except Exception as e:
+            QMessageBox.information(self, "Папка заказа", f"{folder}\n\n({e})")
 
     def apply_status_to_selected(self):
         """Применить выбранный в комбобоксе статус к выделенному заказу в истории"""

@@ -148,11 +148,29 @@ class _MaxRectsSheet:
                 i += 1
 
 
+# ПОРЯДОК УКЛАДКИ - второй рычаг после эвристики.
+#
+# Раньше сортировка была одна (по большей стороне), и перебирались только
+# 4 эвристики. Но у MaxRects порядок деталей влияет не меньше эвристики:
+# замер на комплексе К 01 (79 деталей) показал
+#     по большей стороне -> 9 листов / 64.3%
+#     ПО ПЛОЩАДИ         -> 8 листов / 72.3%
+# то есть целый лист металла разницы на одном заказе. Поэтому перебираем
+# сортировки вместе с эвристиками и берём лучший результат.
+_SORT_ORDERS = (
+    ("площадь",     lambda p: -(p.width * p.height)),
+    ("max-сторона", lambda p: -max(p.width, p.height)),
+    ("высота",      lambda p: -p.height),
+    ("ширина",      lambda p: -p.width),
+    ("периметр",    lambda p: -(p.width + p.height)),
+)
+
+
 def pack_parts(parts, sheet_width, sheet_height, margin, gap):
     """
-    Разложить детали по листам, пробуя несколько эвристик MaxRects и выбирая
-    лучший результат (наименьшее число листов, при равенстве - наибольший
-    процент использования на последнем листе).
+    Разложить детали по листам, перебирая СОРТИРОВКИ x ЭВРИСТИКИ MaxRects и
+    выбирая лучший результат (наименьшее число листов, при равенстве -
+    наибольший процент использования на последнем листе).
 
     Args:
         parts: список объектов Part (у каждого .width, .height, .quantity)
@@ -166,47 +184,52 @@ def pack_parts(parts, sheet_width, sheet_height, margin, gap):
     best_result = None
     best_score = None
 
-    # Пробуем все 4 эвристики - каждая лучше на разных наборах деталей.
-    # Разница по времени незаметная (< 100мс на десятки деталей),
-    # а выигрыш по использованию металла может быть заметным.
-    for heuristic in ('BSSF', 'BLSF', 'BAF', 'BL'):
-        try:
-            result = _pack_parts_with_heuristic(parts, sheet_width, sheet_height, margin, gap, heuristic)
-        except ValueError:
-            # Эта эвристика не смогла разложить (обычно все не могут, если деталь
-            # реально не влезает - переигрываем на следующей и в конце пробрасываем)
-            continue
+    # Перебираем ВСЕ сочетания «сортировка x эвристика» (5 x 4 = 20 прогонов).
+    # Каждое лучше на своём наборе деталей. По времени незаметно (десятки мс
+    # на десятки деталей), а выигрыш - реальный лист металла.
+    for _sort_name, sort_key in _SORT_ORDERS:
+        for heuristic in ('BSSF', 'BLSF', 'BAF', 'BL'):
+            try:
+                result = _pack_parts_with_heuristic(parts, sheet_width, sheet_height,
+                                                    margin, gap, heuristic, sort_key)
+            except ValueError:
+                # Не смогла разложить (обычно НИ одна не может, если деталь
+                # реально не влезает - в конце пробросим ошибку явно)
+                continue
 
-        n_sheets = len(result)
-        # Считаем использование последнего листа: чем полнее, тем лучше упаковка
-        last_sheet_area = sum(pd['width'] * pd['height'] for pd in result[-1]['parts']) if result else 0
-        sheet_capacity = sheet_width * sheet_height
-        last_usage = last_sheet_area / sheet_capacity if sheet_capacity else 0
+            n_sheets = len(result)
+            # Использование последнего листа: чем полнее, тем лучше упаковка
+            last_sheet_area = (sum(pd['width'] * pd['height'] for pd in result[-1]['parts'])
+                               if result else 0)
+            sheet_capacity = sheet_width * sheet_height
+            last_usage = last_sheet_area / sheet_capacity if sheet_capacity else 0
 
-        # Меньше листов лучше; при равенстве - меньше "заполненность" последнего листа лучше
-        # (значит, ушла бы новая деталь в него без нового листа)
-        score = (n_sheets, -last_usage)
-        if best_score is None or score < best_score:
-            best_score = score
-            best_result = result
+            # Главное - меньше листов; при равенстве берём тот вариант, где
+            # последний лист забит плотнее.
+            score = (n_sheets, -last_usage)
+            if best_score is None or score < best_score:
+                best_score = score
+                best_result = result
 
     if best_result is None:
-        # Все эвристики упали - значит правда деталь не влезает, дадим финальную ошибку
+        # Все варианты упали - значит правда деталь не влезает, дадим финальную ошибку
         return _pack_parts_with_heuristic(parts, sheet_width, sheet_height, margin, gap, 'BSSF')
 
     return best_result
 
 
-def _pack_parts_with_heuristic(parts, sheet_width, sheet_height, margin, gap, heuristic):
-    """Раскрой с конкретной эвристикой MaxRects."""
+def _pack_parts_with_heuristic(parts, sheet_width, sheet_height, margin, gap,
+                               heuristic, sort_key=None):
+    """Раскрой с конкретной эвристикой MaxRects и порядком укладки sort_key."""
     # Развернуть quantity в отдельные экземпляры
     all_parts = []
     for part in parts:
         for _ in range(part.quantity):
             all_parts.append(part)
 
-    # Сортировка от больших к меньшим (крупные первыми, мелкими добиваем "карманы")
-    all_parts.sort(key=lambda p: max(p.width, p.height), reverse=True)
+    # Порядок укладки: крупные первыми, мелкими добиваем "карманы".
+    # Конкретный критерий подбирается перебором в pack_parts (см. _SORT_ORDERS).
+    all_parts.sort(key=sort_key or (lambda p: -max(p.width, p.height)))
 
     usable_w = sheet_width - 2 * margin
     usable_h = sheet_height - 2 * margin
