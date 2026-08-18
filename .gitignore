@@ -26,3 +26,6 @@ scratchpad/
 *.bak.*
 Thumbs.db
 desktop.ini
+
+# Локальная история заказов — у каждой машины своя, не синхронизируем
+cad/reports/order_history.json
