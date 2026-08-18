@@ -147,11 +147,20 @@ class DXFExporter:
         """Выгрузка электрошкафа единым раскроем + отчёт, совместимый с UI."""
         Config.init_dirs()
         parts = list(module.parts)
-        # export_cut_layout сам обходит занятый файл (Permission denied, если
-        # DXF открыт в АвтоКАД) и возвращает реальный путь сохранения.
-        filename = DXFExporter.export_cut_layout(parts, order_file(module, "Раскрой.dxf"))
+        # Два раскроя на выбор оператора: с пунктиром линий гиба (как просит
+        # цех) и с уголками-метками (как эталон мастера). Рез (слой 0) в обоих
+        # одинаковый — различаются только метки гиба на тонком слое.
+        # export_cut_layout сам обходит занятый файл и возвращает реальный путь.
+        f_dash = DXFExporter.export_cut_layout(
+            parts, order_file(module, "Раскрой (пунктир линий гиба).dxf"),
+            bend_style='dashed')
+        f_corn = DXFExporter.export_cut_layout(
+            parts, order_file(module, "Раскрой (уголки-метки).dxf"),
+            bend_style='corners')
+        filename = f_dash   # основной для отчёта/истории
 
         report = DXFExporter._cut_layout_report(filename, module, parts)
+        report['dxf_files'] = [f_dash, f_corn]
         report_path = order_file(module, "Отчёт раскроя.json")
         try:
             with open(report_path, "w", encoding="utf-8") as f:
@@ -267,7 +276,7 @@ class DXFExporter:
 
     @staticmethod
     def export_cut_layout(parts, filename, gap=40, with_bend_marks=True,
-                          annotate=True):
+                          annotate=True, bend_style='dashed'):
         """
         Единый DXF-раскрой В ФОРМАТЕ МАСТЕРА: голая геометрия всех деталей,
         разложенных в ряд, на слое "0" (контур+вырезы) + метки гиба на тонком
@@ -286,6 +295,8 @@ class DXFExporter:
         doc = ezdxf.new("R2000", setup=True)
         doc.header['$DWGCODEPAGE'] = 'ANSI_1251'
         doc.encoding = 'cp1251'          # см. комментарий в export()
+        # Масштаб штрихов, чтобы пунктир линий гиба был виден на деталях в сотни мм.
+        doc.header['$LTSCALE'] = 10
         if DXFExporter.THIN_BEND_LAYER not in doc.layers:
             doc.layers.add(DXFExporter.THIN_BEND_LAYER, color=7,
                            linetype="CONTINUOUS")
@@ -295,7 +306,8 @@ class DXFExporter:
 
         x = 0.0
         for part in parts:
-            DXFExporter._draw_bare_part(msp, part, x, 0.0, with_bend_marks)
+            DXFExporter._draw_bare_part(msp, part, x, 0.0, with_bend_marks,
+                                        bend_style=bend_style)
             if annotate:
                 # Имя + габарит развёртки над деталью, на отдельном слое.
                 label = _dxf_safe(f"{part.name}  {int(part.width)}x{int(part.height)}")
@@ -307,7 +319,61 @@ class DXFExporter:
         return DXFExporter._safe_saveas(doc, filename)
 
     @staticmethod
-    def _draw_bare_part(msp, part, ox, oy, with_bend_marks=True, cut_layer='0'):
+    def _draw_bends(msp, part, ox, oy, style='dashed'):
+        """
+        Нарисовать линии гиба на тонком слое в одном из двух стилей:
+          'dashed'  — полные ПУНКТИРНЫЕ линии по всем сгибам (как просит цех)
+          'corners' — короткие УГОЛКИ-метки в углах краевых бортов (как эталон
+                      мастера); внутренние сгибы корпуса ('inner') всё равно
+                      рисуются полной линией — уголками их не показать.
+        """
+        THIN = DXFExporter.THIN_BEND_LAYER
+        W, H = part.width, part.height
+        bl = [b for b in getattr(part, 'bend_lines', []) if b.direction != 'seam']
+
+        def full(b, dashed):
+            if b.edge == 'left':
+                p1, p2 = (ox + b.offset, oy), (ox + b.offset, oy + H)
+            elif b.edge == 'right':
+                p1, p2 = (ox + W - b.offset, oy), (ox + W - b.offset, oy + H)
+            elif b.edge == 'top':
+                p1, p2 = (ox, oy + H - b.offset), (ox + W, oy + H - b.offset)
+            else:
+                p1, p2 = (ox, oy + b.offset), (ox + W, oy + b.offset)
+            attr = {'layer': THIN}
+            if dashed:
+                attr['linetype'] = 'DASHED'
+            try:
+                msp.add_line(p1, p2, dxfattribs=attr)
+            except Exception:
+                msp.add_line(p1, p2, dxfattribs={'layer': THIN})
+
+        if style == 'dashed':
+            for b in bl:
+                full(b, True)
+            return
+
+        # style == 'corners': внутренние сгибы корпуса НЕ рисуем линией —
+        # уголок гиба (полукруглый надрез) уже врезан в контур на кромке
+        # (см. _body_outline), как в эталоне. Сплошная линия через деталь была
+        # бы неправильной.
+        # краевые борта — уголки-метки в углах, где сходятся два борта (эталон)
+        off = {b.edge: b.offset for b in bl if b.direction in ('up', 'down')}
+        corners_spec = [
+            (ox, oy, 1, 1, 'left', 'bottom'), (ox + W, oy, -1, 1, 'right', 'bottom'),
+            (ox + W, oy + H, -1, -1, 'right', 'top'), (ox, oy + H, 1, -1, 'left', 'top'),
+        ]
+        for cx, cy, sx, sy, ex, ey in corners_spec:
+            if ex in off and ey in off:
+                fx, fy = off[ex], off[ey]
+                msp.add_line((cx, cy + sy * fy), (cx + sx * fx, cy + sy * fy),
+                             dxfattribs={'layer': THIN})
+                msp.add_line((cx + sx * fx, cy), (cx + sx * fx, cy + sy * fy),
+                             dxfattribs={'layer': THIN})
+
+    @staticmethod
+    def _draw_bare_part(msp, part, ox, oy, with_bend_marks=True, cut_layer='0',
+                        bend_style='dashed'):
         """
         Нарисовать одну деталь голой геометрией, как у мастера: контур
         (с угловыми вырезами/скруглениями, если есть) и вырезы на слое реза,
@@ -354,28 +420,9 @@ class DXFExporter:
                 msp.add_circle((cx, cy), ct.radius,
                                dxfattribs={'layer': cut_layer, 'color': 7})
 
-        # Метки гиба: короткий L-штрих в каждом углу, где сходятся два гнутых
-        # борта (как в эталоне мастера). Длина штриха = позиция линии гиба.
+        # Линии гиба на тонком слое (стиль: 'dashed' пунктир / 'corners' уголки).
         if with_bend_marks:
-            off = {}
-            for b in getattr(part, 'bend_lines', []):
-                if b.direction != 'seam':
-                    off.setdefault(b.edge, b.offset)
-            W, H = part.width, part.height
-            # (угол cx,cy ; направление внутрь sx,sy ; кромка_x ; кромка_y)
-            corners_spec = [
-                (ox,     oy,     1,  1, 'left',  'bottom'),
-                (ox + W, oy,    -1,  1, 'right', 'bottom'),
-                (ox + W, oy + H, -1, -1, 'right', 'top'),
-                (ox,     oy + H,  1, -1, 'left',  'top'),
-            ]
-            for cx, cy, sx, sy, ex, ey in corners_spec:
-                if ex in off and ey in off:
-                    fx, fy = off[ex], off[ey]
-                    msp.add_line((cx, cy + sy * fy), (cx + sx * fx, cy + sy * fy),
-                                 dxfattribs={'layer': DXFExporter.THIN_BEND_LAYER})
-                    msp.add_line((cx + sx * fx, cy), (cx + sx * fx, cy + sy * fy),
-                                 dxfattribs={'layer': DXFExporter.THIN_BEND_LAYER})
+            DXFExporter._draw_bends(msp, part, ox, oy, bend_style)
 
     @staticmethod
     def _draw_part(msp, part_data, offset_y=0, part_number=1):

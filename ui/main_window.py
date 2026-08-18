@@ -788,10 +788,15 @@ class MainWindow(QMainWindow):
                 if is_configured():
                     push_module_order(self.cabinet.name, "", self.cabinet, result['report'])
 
+            # Для электрошкафа генерируется ДВА файла (с пунктиром линий гиба и
+            # с уголками-метками) — показываем оба.
+            files = result['report'].get('dxf_files') or [result['dxf_path']]
+            files_txt = "\n".join(os.path.basename(f) for f in files)
             QMessageBox.information(
                 self, "Успех",
-                f"✅ Чертёж сохранён:\n{result['dxf_path']}\n\n"
-                f"📊 Отчёт сохранён:\n{result['report_path']}"
+                f"✅ Чертёж сохранён ({len(files)} файл(а)):\n{files_txt}\n\n"
+                f"Папка:\n{os.path.dirname(result['dxf_path'])}\n\n"
+                f"📊 Отчёт сохранён:\n{os.path.basename(result['report_path'])}"
             )
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка экспорта DXF:\n{str(e)}")

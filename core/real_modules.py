@@ -42,6 +42,8 @@ from core.models import Part, BendLine, Cutout, TubePart
 from core.module import Module
 from core.rules import Rules
 from core.electrical_cabinet import ElectricalCabinet
+from core.fire_cabinet import FireCabinet
+from core.table import Table
 
 # --- Константы гибки (из развёрток мастера) ---
 RELIEF = 2.51           # зазор угловой релиз-прорези (x76 по комплекту)
@@ -747,6 +749,12 @@ REAL_MODULES = {
     # = все детали + 3 двери на выбор. Габарит эталона 400x445x150, 1.2мм;
     # размеры параметрические. Выгрузка DXF идёт единым раскроем (cut_layout).
     "ecab": ("ЭШ · Электромонтажный шкаф", ElectricalCabinet.build, 400),
+    # Пожарный шкаф (см. core/fire_cabinet). Навесной, однодверный, единый
+    # раскрой = 4 детали (корпус + 2 крышки + дверь). Габарит 540x655x200.
+    "fire": ("ПШ · Пожарный шкаф", FireCabinet.build, 540),
+    # Стол (см. core/table). Точные контуры 10 деталей с эталона, единый
+    # раскрой. Геометрия 1:1 по эталону; параметрика — после габаритов цеха.
+    "table": ("СТ · Стол", Table.build, 0),
 }
 
 

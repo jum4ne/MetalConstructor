@@ -158,10 +158,18 @@ class Part:
         return self.height
 
     def _fold_total(self, axis):
-        """Суммарный припуск на загиб по оси ('x' = left/right, 'y' = top/bottom)"""
+        """
+        Суммарный припуск на загиб по оси ('x' = left/right, 'y' = top/bottom).
+
+        Считаются только КРАЕВЫЕ борта (direction up/down) — они вычитаются из
+        габарита развёртки, чтобы получить размер готовой детали. Внутренние
+        линии гиба корпуса (direction 'inner' — сгибы «задняя↔боковина»,
+        заданные абсолютной позицией, а не глубиной полки) и швы ('seam') НЕ
+        считаются: иначе formed_width уходил в минус (сумма позиций > ширины).
+        """
         edges = ('left', 'right') if axis == 'x' else ('top', 'bottom')
         return sum(b.offset for b in self.bend_lines
-                   if b.edge in edges and b.direction != 'seam')
+                   if b.edge in edges and b.direction in ('up', 'down'))
 
     @property
     def formed_width(self):

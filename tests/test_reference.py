@@ -286,6 +286,11 @@ class TestParametric:
     def test_смена_ширины_меняет_детали(self):
         from core import real_modules as R
         for key in R.REAL_MODULES:
+            # Стол пока воспроизводится 1:1 по эталону (геометрия фиксированная):
+            # габаритной привязки Ш×В×Г от цеха ещё нет. Параметрику добавим,
+            # когда придут размеры стола — тогда убрать из исключения.
+            if key == "table":
+                continue
             a = R.build(key)
             b = R.build(key, width=a.width + 300)
             pa = {p.name: (p.width, p.height) for p in a.parts}
@@ -353,11 +358,11 @@ class TestBendSemantics:
         from core.geometry import bend_deduction
         BD = bend_deduction(1.0, 90)
         for key in R.REAL_MODULES:
-            # Электрошкаф — другой производитель/станок: аддитивная модель гиба
-            # (вычет ≈ 0, offset == nominal), калибровка по своему эталону
-            # (см. core/electrical_cabinet). Инвариант кухонного цеха к нему
-            # не применяется — правится, когда придут параметры станка.
-            if key.startswith("ecab"):
+            # Электрошкаф и пожарный шкаф — другой производитель/станок:
+            # аддитивная модель гиба (вычет ≈ 0, offset == nominal), калибровка
+            # по своему эталону (см. core/electrical_cabinet, core/fire_cabinet).
+            # Инвариант кухонного цеха к ним не применяется.
+            if key.startswith(("ecab", "fire")):
                 continue
             m = R.build(key)
             parts = list(m.parts) + [p for s in m.subassemblies for p in s.parts]
@@ -403,6 +408,21 @@ class TestElectricalCabinet:
         assert sum("Дверь" in n for n in names) == 3, "должно быть 3 двери на выбор"
         assert sum("Крышка" in n for n in names) == 2
         assert sum("Полоска" in n for n in names) == 2
+
+    def test_корпус_развёртка_и_линии_гиба(self):
+        # Корпус: развёртка ~714x440 (эталон 714.5x441), гнётся по 4 внутренним
+        # линиям (задняя↔боковины↔возвратные полки). formed НЕ отрицательный.
+        from core.electrical_cabinet import build_body
+        b = build_body(400, 445, 150, 1.2)
+        assert b.width == pytest.approx(714, abs=2)
+        assert b.height == pytest.approx(440, abs=2)
+        inner = [x for x in b.bend_lines if x.direction == "inner"]
+        assert len(inner) == 4, "корпус гнётся по 4 линиям"
+        # регресс: внутренние сгиби не должны вычитаться из габарита в минус
+        assert b.formed_width > 0 and b.formed_height > 0
+        # параметрика: другой габарит -> другая развёртка
+        b2 = build_body(540, 655, 200, 1.2)
+        assert b2.width > b.width and b2.height > b.height
 
     def test_развёртка_двери_совпадает_с_эталоном(self):
         # Эталон мастера: дверь 430.5 x 471. Аддитивная модель даёт 431 x 471.
